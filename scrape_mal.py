@@ -6,8 +6,11 @@ import re
 import time
 import random
 import argparse
+import pickle
 
 import requests
+import jikanpy
+import discord
 from bs4 import BeautifulSoup
 
 # basic rules
@@ -19,11 +22,16 @@ from bs4 import BeautifulSoup
 # 3b.1) Continue checking pages till you don't find a new entry for 5 pages
 
 # the last time the 50 pages and the entirety of MAL should be saved in a file called 'state'.
-# since the discord bot and scraper are going to run on different PIDs, while we are scraping
-# a file called 'lock' should be in the root directory, which forbids the discord bot from
-# trying to read/log new entries, from a file called 'new'.
-# the discord bot process will then read all entries from 'new' to 'old',
+# since the discord bot and scraper are going to run on different PIDs, this script will output
+# any new MAL IDs to 'new', and the discord bot script will read from there periodically,
 # logging them in the server in the process
+
+# 
+
+class request_type:
+    six_pages = 1
+    fifty_pages = 2
+    all_pages = 3
 
 base_url="https://myanimelist.net/anime.php?o=9&c%5B0%5D=a&c%5B1%5D=d&cv=2&w=1&show={}"
 
@@ -91,10 +99,10 @@ def make_jikan_animelist_request(j, username, page, retry, jikan_exception):
         resp = j.user(username=username, request='animelist', argument='all', page=page)
         time.sleep(1)
         return resp
-    except jikanpy.exceptions.JikanException as jex:
+    except (jikanpy.exceptions.JikanException, jikanpy.exceptions.APIException) as jex:
         # if we fail, increment retry and call again
         print("... Failed with {}, retrying... ({} of 5)".format(type(jex).__name__, retry))
-        return make_jikan_animelist_request(username, page, j, retry + 1, jex)
+        return make_jikan_animelist_request(j, username, page, retry + 1, jex)
 
 # j: jikan object
 def download_anime_list(uname, j):
@@ -129,7 +137,32 @@ def get_ids_from_search_page(page_number, crawler):
         m = re.search("https:\/\/myanimelist\.net\/anime\/(\d+)", link["href"])
         yield m.group(1)
 
-def loop(crawler):
+def make_embed(anime_json_data):
+    embed=discord.Embed(title=anime_json_data['title'], url=anime_json_data['url'], color=discord.Colour.dark_blue())
+    embed.set_thumbnail(url=anime_json_data['image_url'])
+    embed.add_field(name="Status", value=anime_json_data['status'], inline=True)
+    if 'from' in anime_json_data['aired'] and anime_json_data['aired']['from'] is not None:
+        embed.add_field(name="Air Date", value=anime_json_data['aired']['from'].split("T")[0], inline=True)
+    embed.add_field(name="Synopsis", value=anime_json_data['synopsis'], inline=False)
+    genre_names = [g['name'] for g in anime_json_data['genres']]
+    # the second index in return value specifies if this is SFW
+    return (embed, "Hentai" not in genre_names)
+
+def make_anime_jikan_request(jikan, mal_id, retry, jikan_exception):
+    # if we've failed to get this page 5 times or more
+    if retry >= 5:
+        print("Failed to get anime information for {} from jikan 5 times.".format(mal_id))
+        raise jikan_exception
+    try:
+        print("Requesting {}".format(mal_id))
+        resp = jikan.anime(int(mal_id))
+        time.sleep(3 * retry) # actual sleep to ensure API compliance
+        return resp
+    except (jikanpy.exceptions.JikanException, jikanpy.exceptions.APIException) as jex:
+        # if we fail, increment retry and call again
+        return make_anime_jikan_request(jikan, mal_id, retry + 1, jex)
+
+def loop(crawler, j):
     # state has 2 lines in it, the first is last time we scraped the first 50 pages
     # the second is the last time we scraped the entirety of MAL
     # we should scrape the first 50 pages every 2 days and all the pages once a week
@@ -138,6 +171,7 @@ def loop(crawler):
     first_50_pages = 0
     all_pages = 0
     page_range = 6
+    req_type = request_type.six_pages
     if os.path.exists("state"):
         with open("state", "r") as last_scraped:
             first_50_pages, all_pages = map(lambda x: int(float(x)), last_scraped.read().strip().splitlines())
@@ -145,17 +179,11 @@ def loop(crawler):
         # every 14 days
         if int(time.time()) - all_pages > 3600 * 24 * 7 * 2: # seconds in 2 weeks
             page_range = 99999
-            # write current time to 'state', all pages counts as 50 pages as well
-            with open("state", "w") as last_scraped:
-                last_scraped.write("{}\n{}".format(time.time(), time.time()))
+            req_type = request_type.all_pages
         # every 2 days
         elif int(time.time()) - first_50_pages > 3600 * 24 * 2: # seconds in 2 days
             page_range = 50
-            with open("state", "w") as last_scraped:
-                last_scraped.write("{}\n{}".format(time.time(), all_pages))
-        print(page_range)
-        # create lock file
-        open("lock", 'a').close()
+            req_type = request_type.fifty_pages
         # read old database
         old_db = read_old_db()
         new_ids = []
@@ -177,27 +205,42 @@ def loop(crawler):
                     new_ids.append(page_id)
             current_page += 1
 
+        # if we looked at the first 50 or all pages, write time to 'state'
+        if req_type == request_type.all_pages:
+            # write current time to 'state', all pages counts as 50 pages as well
+            with open("state", "w") as last_scraped:
+                last_scraped.write("{}\n{}".format(time.time(), time.time()))
+        elif req_type == request_type.fifty_pages:
+            with open("state", "w") as last_scraped:
+                last_scraped.write("{}\n{}".format(time.time(), all_pages))
+        
         # write new entries, if any
         if new_ids:
-            with open("new", "w") as new_entries:
-                for new_id in new_ids:
-                    new_entries.write("{}\n".format(new_id))
-        # done scraping, remove lock file
-        os.remove("lock")
+            # create list of pickled embeds
+            pickles = []
+            for new_id in new_ids:
+                try:
+                    anime_json_resp = make_anime_jikan_request(j, new_id, 0, None)
+                    pickles.append(make_embed(anime_json_resp))
+                except jikanpy.exceptions.JikanException:
+                    print("Could not request {} from Jikan".format(new_id))
+                    continue
+            if pickles:
+                with open("new", "wb") as new_entries:
+                    pickle.dump(pickles, new_entries)
         print("Sleeping...")
         time.sleep(int(60*random.uniform(27, 35))) # sleep for around 30 minutes
 
 def main(init):
+    j = jikanpy.Jikan()
     if init:
         print("Initializing database with {}'s anime list".format(init))
-        import jikanpy
-        j = jikanpy.Jikan()
         entries = download_anime_list(init, j)
         with open("old", "w") as old_f:
             for entry in entries:
                 old_f.write("{}\n".format(entry["mal_id"]))
     crawler = crawl(wait=14, retry_max=4)
-    loop(crawler)
+    loop(crawler, j)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
