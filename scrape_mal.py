@@ -26,8 +26,6 @@ from bs4 import BeautifulSoup
 # any new MAL IDs to 'new', and the discord bot script will read from there periodically,
 # logging them in the server in the process
 
-# 
-
 class request_type:
     six_pages = 1
     fifty_pages = 2
@@ -173,6 +171,10 @@ def loop(crawler, j):
     # we should create a file named 'pid' that contains this process' pid
     # incase this file crashes for some reason, so we can restart it
 
+    # create pid file
+    with open('pid', 'w') as pid_f:
+        pid_f.write(str(os.getpid()))
+
     first_50_pages = 0
     all_pages = 0
     page_range = 6
@@ -181,10 +183,7 @@ def loop(crawler, j):
         with open("state", "r") as last_scraped:
             first_50_pages, all_pages = map(lambda x: int(float(x)), last_scraped.read().strip().splitlines())
     while True:
-        # create pid file
-        with open('pid', 'w') as pid_f:
-            pid_f.write(str(os.getpid()))
-        # every 14 days
+         # every 14 days
         if int(time.time()) - all_pages > 3600 * 24 * 7 * 2: # seconds in 2 weeks
             page_range = 99999
             req_type = request_type.all_pages
