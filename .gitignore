@@ -5,6 +5,7 @@ lock
 state
 old
 new
+pid
 
 # Emacs
 

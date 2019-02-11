@@ -168,6 +168,11 @@ def loop(crawler, j):
     # we should scrape the first 50 pages every 2 days and all the pages once a week
 
     # otherwise scrape the first 6 pages (and keep going if you find new entries) every 30 minutes
+
+    # this script will be called by `python3 bot.py` as an os.system call
+    # we should create a file named 'pid' that contains this process' pid
+    # incase this file crashes for some reason, so we can restart it
+
     first_50_pages = 0
     all_pages = 0
     page_range = 6
@@ -176,6 +181,9 @@ def loop(crawler, j):
         with open("state", "r") as last_scraped:
             first_50_pages, all_pages = map(lambda x: int(float(x)), last_scraped.read().strip().splitlines())
     while True:
+        # create pid file
+        with open('pid', 'w') as pid_f:
+            pid_f.write(str(os.getpid()))
         # every 14 days
         if int(time.time()) - all_pages > 3600 * 24 * 7 * 2: # seconds in 2 weeks
             page_range = 99999

@@ -21,11 +21,21 @@ with open('token.yaml', 'r') as t:
 client = commands.Bot(command_prefix=commands.when_mentioned, case_insensitive=False)
 client.remove_command('help') # remove default help
 
-period = 2 * 60  # how often (in seconds) to check if there are new entries
+period = 3 * 60  # how often (in seconds) to check if there are new entries
 
 feed_channel = None
 nsfw_feed_channel = None
 verbose_flag = True
+
+# https://stackoverflow.com/a/568285
+def check_pid(pid):
+    """ Check For the existence of a unix pid. """
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    else:
+        return True
 
 @client.event
 async def on_ready():
@@ -39,9 +49,13 @@ async def on_ready():
 # this is run in event loop, see bottom of file
 async def loop():
     while not client.is_closed:
-        print("Started outer loop")
+        # check if scraper is running
+        with open('pid', 'r') as pid_f:
+            pid = int(pid_f.read())
+        if not check_pid(pid):
+            # call scrape_mal.py as a background process
+            os.system("python3 scrape_mal.py > {}-scrape_mal.log &".format(int(time.time())))
         if client.is_logged_in and os.path.exists("new"):
-            print("Started inner loop")
             await add_new_entries()
         await sleep(period) # check for 'new' file periodically
 
@@ -113,11 +127,12 @@ async def source(ctx, mal_id: int, link:str):
                 elif f['name'] == "Source":
                     new_embed.add_field(name=f['name'], value=link, inline=False)
             # if there wasn't a source field
-            if "Source" not in [f['name'] for f in embed['fields']]:
+            is_new_source = "Source" not in [f['name'] for f in embed['fields']]
+            if is_new_source:
                 new_embed.add_field(name="Source", value=link, inline=False)
             # edit message with new embed
             await client.edit_message(message, embed=new_embed)
-            await client.say("Added source for '{}' successfully.".format(embed['title']))
+            await client.say("{} source for '{}' successfully.".format("Added" if is_new_source else "Replaced", embed['title']))
             return
     await client.say("Could not find a message that conatins the MAL id {} in {}".format(mal_id, feed_channel.mention))
     
