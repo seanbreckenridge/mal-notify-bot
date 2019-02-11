@@ -118,11 +118,11 @@ async def source(ctx, mal_id: int, link:str):
             new_embed.set_thumbnail(url=embed['thumbnail']['url'])
             for f in embed['fields']:
                 if f['name'] == "Status":
-                    new_embed.add_field(name=f['name'], value=f['value'], inline=True)
+                    new_embed.add_field(name="Status", value=f['value'], inline=True)
                 elif f['name'] == "Air Date":
-                    new_embed.add_field(name=f['name'], value=f['value'], inline=True)
+                    new_embed.add_field(name="Air Date", value=f['value'], inline=True)
                 elif f['name'] == "Synopsis":
-                    new_embed.add_field(name=f['name'], value=f['value'], inline=False)
+                    new_embed.add_field(name="Synopsis", value=f['value'], inline=False)
                 # if there was already a source field, replace it
                 elif f['name'] == "Source":
                     new_embed.add_field(name=f['name'], value=link, inline=False)

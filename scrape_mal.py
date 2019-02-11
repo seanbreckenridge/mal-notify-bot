@@ -141,7 +141,11 @@ def make_embed(anime_json_data):
     embed.add_field(name="Status", value=anime_json_data['status'], inline=True)
     if 'from' in anime_json_data['aired'] and anime_json_data['aired']['from'] is not None:
         embed.add_field(name="Air Date", value=anime_json_data['aired']['from'].split("T")[0], inline=True)
-    embed.add_field(name="Synopsis", value=anime_json_data['synopsis'], inline=False)
+    if anime_json_data['synopsis'] is not None:
+        if len(anime_json_data['synopsis']) > 1020:
+            embed.add_field(name="Synopsis", value=anime_json_data['synopsis'][:1020] + "...", inline=False)
+        else:
+            embed.add_field(name="Synopsis", value=anime_json_data['synopsis'], inline=False)
     genre_names = [g['name'] for g in anime_json_data['genres']]
     # the second index in return value specifies if this is SFW
     return (embed, "Hentai" not in genre_names)
