@@ -4,15 +4,15 @@ import re
 import time
 import pickle
 
-from discord import Client, Embed, Colour
+import yaml
+import requests
+
+from discord import Client, Embed, Color
 from discord.ext import commands
 from discord.utils import get
 from asyncio import sleep
 
-import yaml
-import jikanpy
-
-# Token is stored in token.yaml, with the key token
+# Token is stored in token.yaml, with the key 'token'
 
 with open('token.yaml', 'r') as t:
     token = yaml.load(t)["token"]
@@ -21,12 +21,11 @@ with open('token.yaml', 'r') as t:
 client = commands.Bot(command_prefix=commands.when_mentioned, case_insensitive=False)
 client.remove_command('help') # remove default help
 
-period = 30  # how often to check if there are new entries
+period = 2 * 60  # how often (in seconds) to check if there are new entries
 
 feed_channel = None
 nsfw_feed_channel = None
 verbose_flag = True
-jikan = jikanpy.Jikan()
 
 @client.event
 async def on_ready():
@@ -72,27 +71,63 @@ async def test_log(ctx):
     await client.send_message(feed_channel, "test message. beep boop")
     await client.send_message(nsfw_feed_channel, "test message. beep boop")
 
-
 @client.command(pass_context=True)
-async def verbose(ctx):
-    global verbose_flag
-    if not ctx.message.author.server_permissions.administrator:
-        await client.say("This command can only be run by administrators.")
+async def source(ctx, mal_id: int, link:str):
+    author = ctx.message.author
+    if not (author.server_permissions.administrator or "trusted" in [role.name.lower() for role in author.roles]):
+        await client.say("You must have the `trusted` role or be an administrator to use this command.")
         return
-    if not verbose_flag:
-        verbose_flag = True
-        await client.say("Verbose logs have been toggled on.")
-    else:
-        verbose_flag = False
-        await client.say("Verbose logs have been toggled off.")
-
+    # remove supression from link, if it exists
+    if link[0] == "<":
+        link = link[1:]
+    if link[-1] == ">":
+        link = link[0:-1]
+    # test if link exists
+    try:
+        resp = requests.get(link)
+    except requests.exceptions.MissingSchema:
+        await client.say("`{}` has no schema (e.g. https), its not a valid URL.".format(link))
+        return
+    if not resp.status_code == requests.codes.ok:
+        await client.say("Error connecting to `` with status code {}".format(link, resp.status_code))
+        return
+    # get logs from feed
+    async for message in client.logs_from(feed_channel, limit=999999, reverse=True):
+        try:
+            embed = message.embeds[0]
+        except Exception as e: # i.e. test_log messages that don't have embeds
+            continue
+        m = re.search("https:\/\/myanimelist\.net\/anime\/(\d+)", embed['url'])
+        # if this matches the MAL id
+        if m.group(1) == str(mal_id):
+            new_embed=Embed(title=embed['title'], url=embed['url'], color=Color.dark_blue())
+            new_embed.set_thumbnail(url=embed['thumbnail']['url'])
+            for f in embed['fields']:
+                if f['name'] == "Status":
+                    new_embed.add_field(name=f['name'], value=f['value'], inline=True)
+                elif f['name'] == "Air Date":
+                    new_embed.add_field(name=f['name'], value=f['value'], inline=True)
+                elif f['name'] == "Synopsis":
+                    new_embed.add_field(name=f['name'], value=f['value'], inline=False)
+                # if there was already a source field, replace it
+                elif f['name'] == "Source":
+                    new_embed.add_field(name=f['name'], value=link, inline=False)
+            # if there wasn't a source field
+            if "Source" not in [f['name'] for f in embed['fields']]:
+                new_embed.add_field(name="Source", value=link, inline=False)
+            # edit message with new embed
+            await client.edit_message(message, embed=new_embed)
+            await client.say("Added source for '{}' successfully.".format(embed['title']))
+            return
+    await client.say("Could not find a message that conatins the MAL id {} in {}".format(mal_id, feed_channel.mention))
+    
 @client.command()
 async def help():
     help_str = "User commands:\n`help`: describe commands\n" + \
                "Trusted commands:\n" + \
+               "`source`: Adds a link to a embed in {}. \n\tSyntax: `@notify source <mal_id> <link>`\n\tExample: `@notify source 32287 https://www.youtube.com/watch?v=1RzNDZFQllA`\n".format(feed_channel.mention) + \
                "Administrator commands:\n" + \
-               "`verbose`: toggle verbose logs for command errors\n" + \
-               "`test_log`: send a test message to #feed to check permissions\n"
+               "`test_log`: send a test message to {} to check permissions\n".format(feed_channel.mention)
     await client.say(help_str)
 
 
@@ -100,19 +135,27 @@ async def help():
 @client.command(pass_context=True)
 @client.event
 async def on_command_error(error, ctx):
-    message = ctx.message.content.split(">", maxsplit=1)[1].lower().strip()
-    message = message.replace("@", "") # make sure bot doesn't ping people
-    command_name = message.split()[0]
-    if verbose_flag:
-        await client.send_message(ctx.message.channel, str(error))
-    elif command_name in ['help', 'verbose']: # try to match against commands
-        if command_name == 'help':
-            await help(ctx)
-        elif command_name == 'verbose':
-            await verbose(ctx)
+
+    command_name = ctx.invoked_with.replace("`", "")
+    args = ctx.message.content.split(">", maxsplit=1)[1].strip().replace("`", '').split()
+    
+    # prevent self-loops
+    if hasattr(ctx.command, 'on_error'):
+        print("on_command_error self loop occured")
+        return
+
+    if isinstance(error, commands.CommandNotFound):
+        await client.send_message(ctx.message.channel, "Could not find the command `{}`. Use `@notify help` to see a list of commands.".format(command_name))
+    elif isinstance(error, commands.MissingRequiredArgument) and command_name == "source":
+        await client.send_message(ctx.message.channel, "You're missing one or more arguments for the `source` command.\nExample: `@notify source 31943 https://youtube/...`")
+    elif isinstance(error, commands.BadArgument) and command_name == "source":
+        try:
+            int(args[1])
+        except ValueError:
+            await client.send_message(ctx.message.channel, "Error converting `{}` to an integer".format(args[1]))
     else:
-        await client.send_message(ctx.message.channel, "Unknown command. Use `@notify help` to see a list of commands".format(message.split()[0]))
+        await client.send_message(ctx.message.channel, "Uncaught error [{}]: {}".format(type(error).__name__, error))
+        raise error
 
 client.loop.create_task(loop())
 client.run(token)
-
