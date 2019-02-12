@@ -22,6 +22,6 @@ put your bots token in a file named `token.yaml` with contents like:
 
 `token: !!str EU*#3eiSzEr7i4L36FaTlrV0*RtuGOBVNrcteyrtt$GPAwNtkJKQg*dweSLy`
 
-`python3 bot.py` to start, which calls `python3 scrape_mal.py` as a background process.
+`./run` to start`
 
-Note the names of the channels were `bot.py` posts new links are hard coded, as `feed` and `nsfw-feed`, you can change those [here](https://github.com/purplepinapples/mal-notify-bot/blob/master/bot.py#L45)
+Note the names of the channels were `bot.py` posts new links are hard coded, as `feed` and `nsfw-feed`, you can change those [here](https://github.com/purplepinapples/mal-notify-bot/blob/master/bot.py#L45).
