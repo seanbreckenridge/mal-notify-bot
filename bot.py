@@ -4,7 +4,6 @@ import re
 import time
 import glob
 import pickle
-import signal
 
 import yaml
 import requests
