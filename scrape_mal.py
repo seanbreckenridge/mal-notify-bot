@@ -160,7 +160,9 @@ def get_ids_from_search_page(page_number, crawler):
 
 def make_embed(anime_json_data):
     embed = discord.Embed(title=anime_json_data['title'], url=anime_json_data['url'], color=discord.Colour.dark_blue())
-    embed.set_thumbnail(url=anime_json_data['image_url'])
+    # placeholder image on MAL
+    if not anime_json_data["image_url"].startswith("https://myanimelist.cdn-dena.com/img/sp/icon/"):
+        embed.set_thumbnail(url=anime_json_data['image_url'])
     embed.add_field(name="Status", value=anime_json_data['status'], inline=True)
     if 'from' in anime_json_data['aired'] and anime_json_data['aired']['from'] is not None:
         embed.add_field(name="Air Date", value=anime_json_data['aired']['from'].split("T")[0], inline=True)
