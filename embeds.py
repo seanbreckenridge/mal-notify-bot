@@ -16,7 +16,8 @@ def get_data(mal_id: int, ignore_image: bool, **kwargs):
         soup = bs4.BeautifulSoup(requests.get("https://myanimelist.net/anime/{}".format(mal_id)).text, "html.parser")
     else:
         soup = bs4.BeautifulSoup(crawler.get_html("https://myanimelist.net/anime/{}".format(mal_id)), "html.parser")
-    logger.debug("Generating embed for MAL id: {}".format(mal_id))
+    if logger is not None:
+        logger.debug("Generating embed for MAL id: {}".format(mal_id))
     # name
     name, dash, homepage = soup.title.string.rpartition("-")
     name = name.strip()

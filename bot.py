@@ -255,7 +255,7 @@ async def on_command_error(error, ctx):
     elif isinstance(error, errors.HTTPException):
         await client.send_message(ctx.message.channel, "There was an issue connecting to the Discord API. Wait a few moments and try again.")
     else:
-        await client.send_message(ctx.message.channel, "Uncaught error: {}".format(type(error).__name__, error))
+        await client.send_message(ctx.message.channel, "Uncaught error: {}: {}".format(type(error).__name__, error))
         raise error
 
 client.loop.create_task(loop())
