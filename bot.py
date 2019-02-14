@@ -13,7 +13,7 @@ from discord.ext import commands
 from discord.utils import get
 from asyncio import sleep
 
-from update_embeds import refresh_embed, add_source, remove_source
+from embeds import refresh_embed, add_source, remove_source
 
 # Token is stored in token.yaml, with the key 'token'
 
@@ -208,7 +208,7 @@ async def refresh(ctx, mal_id: int):
         if m.group(1) == str(mal_id):
             new_embed = refresh_embed(embed, mal_id, remove_image)
             await client.edit_message(message, embed=new_embed)
-            await client.say("{} for '{}' successfully.".format("Removed image" if remove_image else "Updated fields" embed['title']))
+            await client.say("{} for '{}' successfully.".format("Removed image" if remove_image else "Updated fields", embed['title']))
             return
     await client.say("Could not find a message that conatins the MAL id {} in {}".format(mal_id, feed_channel.mention))
 
@@ -216,7 +216,7 @@ async def refresh(ctx, mal_id: int):
 async def help():
     help_str = "**User commands**:\n`help`: describe commands\n" + \
                "**Trusted commands**:\n" + \
-               "`source`: Adds a link to a embed in {}\n\tSyntax: `@notify source <mal_id> <link>`".format(feed_channel.mention) +\
+               "`source`: Adds a link to a embed in {}\n\tSyntax: `@notify source <mal_id> <link>`".format(feed_channel.mention) + \
                "\n\tExample: `@notify source 32287 https://www.youtube.com/watch?v=1RzNDZFQllA`\n" + \
                "\t`@notify source <mal_id> remove` will remove a source from an embed\n" + \
                "`add_new`: Checks if there are new entries waiting to be printed. This happens once every 3 minutes automatically\n" + \

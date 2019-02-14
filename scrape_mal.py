@@ -14,6 +14,8 @@ import jikanpy
 import discord
 from bs4 import BeautifulSoup
 
+from embeds import create_embed
+
 # basic rules
 # 1) Check the first 50 pages every 2 days
 # 2) Check the entirety of MAL once a week
@@ -158,50 +160,23 @@ def get_ids_from_search_page(page_number, crawler):
         yield m.group(1)
 
 
-def make_embed(anime_json_data):
-    embed = discord.Embed(title=anime_json_data['title'], url=anime_json_data['url'], color=discord.Colour.dark_blue())
-    # placeholder image on MAL
-    if not anime_json_data["image_url"].startswith("https://myanimelist.cdn-dena.com/img/sp/icon/"):
-        embed.set_thumbnail(url=anime_json_data['image_url'])
-    embed.add_field(name="Status", value=anime_json_data['status'], inline=True)
-    if 'from' in anime_json_data['aired'] and anime_json_data['aired']['from'] is not None:
-        embed.add_field(name="Air Date", value=anime_json_data['aired']['from'].split("T")[0], inline=True)
-    if anime_json_data['synopsis'] is not None:
-        # truncate the synopsis past 400 characters
-        if len(anime_json_data['synopsis']) > 400:
-            embed.add_field(name="Synopsis", value=anime_json_data['synopsis'][:400] + "...", inline=False)
-        else:
-            embed.add_field(name="Synopsis", value=anime_json_data['synopsis'], inline=False)
-    genre_names = [g['name'] for g in anime_json_data['genres']]
-    # the second index in return value specifies if this is SFW
-    return (embed, "Hentai" not in genre_names)
-
-
-def make_anime_jikan_request(jikan, mal_id, retry, jikan_exception):
-    # if we've failed to get this page 5 times or more
-    if retry >= 5:
-        raise jikan_exception
-    try:
-        resp = jikan.anime(int(mal_id))
-        time.sleep(3 * retry)
-        return resp
-    except (jikanpy.exceptions.JikanException, jikanpy.exceptions.APIException) as jex:
-        # if we fail, increment retry and call again
-        return make_anime_jikan_request(jikan, mal_id, retry + 1, jex)
-
 
 class request_type:
-    five = 1
-    twenty_five = 2
-    seventy_five = 3
+    two = 1
+    twelve = 2
+    twenty_five = 3
+    fifty = 4
 
 
-def loop(crawler, j):
-    # state has 2 lines in it, the first is last time we scraped the first 50 pages
-    # the second is the last time we scraped the entirety of MAL
-    # we should scrape the first 50 pages every 2 days and all the pages once a week
+def loop(crawler):
+    # Check:
+    # 2 pages every 30 minutes
+    # 12 pages once every 4 hours
+    # 25 pages once every 2 days
+    # 50 pages once every week
 
-    # otherwise scrape the first 6 pages (and keep going if you find new entries) every 30 minutes
+    # if you find something near the end of a range (e.g. on page 10 while checking 12 pages)
+    # extend the range till you stop finding new entries
 
     # this script will be called by `python3 bot.py` as an os.system call
     # we should create a file named 'pid' that contains this process' pid
@@ -212,26 +187,31 @@ def loop(crawler, j):
         pid_f.write(str(os.getpid()))
 
     while True:
-        # Initialize 'state' values to 0, (i.e. its Jan 1. 1970, so if needed, 25/75 are chekced
-        first_25_pages = 0
-        first_75_pages = 0
-        page_range = 5
-        req_type = request_type.five
+        # Initialize 'state' values to 0, (i.e. its Jan 1. 1970, so if needed, 12/25/50 are chekced
+        first_12_pages = first_25_pages = first_50_pages = 0
+        page_range = 2
+        req_type = request_type.two
 
         # read times from 'state' file
         if os.path.exists("state"):
             with open("state", "r") as last_scraped:
-                first_25_pages, first_75_pages = list(map(int, last_scraped.read().strip().splitlines()))
+                first_12_pages, first_25_pages, first_50_pages = list(map(int, last_scraped.read().strip().splitlines()))
 
-        # if its been 2 weeks since we checked 75 pages
-        if int(time.time() - first_75_pages) > 3600 * 24 * 7 * 2:  # seconds in 2 weeks
-            page_range = 75
-            req_type = request_type.seventy_five
 
-        # if its been 2 dats since we've checked 25 pages
+        # if its been a week since we checked 50 pages
+        if int(time.time() - first_50_pages) > 3600 * 24 * 7:  # seconds in a week
+            page_range = 50
+            req_type = request_type.fifty
+
+        # if its been 2 days since we've checked 25 pages
         elif int(time.time()) - first_25_pages > 3600 * 24 * 2:  # seconds in 2 days
             page_range = 25
             req_type = request_type.twenty_five
+
+	# if its been 4 hours since we've checked 12 pages
+        elif int(time.time()) - first_12_pages > 3600 * 4:  # seconds in 4 hours
+            page_range = 12
+            req_type = request_type.twelve
 
         logger.debug("(loop) checking {} pages".format(page_range))
 
@@ -243,48 +223,49 @@ def loop(crawler, j):
         current_page = 0
         while current_page < page_range:
             page_ids = []
-            logger.debug("Downloading 'Just Added' page {}".format(current_page))
             mal_ids = list(get_ids_from_search_page(current_page, crawler))
             for mal_id in mal_ids:
                 # if this is a new entry
                 if mal_id not in old_db:
                     # found a new entry, extend how many pages we should check
                     extend_by = 5 + int(current_page / 5)
-                    page_range_before_extend = int(page_range)
-                    page_range = current_page + extend_by
+                    page_range_before_extend = page_range
+                    if current_page + extend_by > page_range:
+                        page_range = current_page + extend_by
                     new_ids.append(mal_id)
-                    logger.debug("Found new MAL Entry: {}".format(mal_id))
+                    logger.debug("Found new MAL entry ({}) on page: {}".format(mal_id, current_page))
                     if page_range != page_range_before_extend:
-                        logger.debug("Found new entry on page {}. Extending search by {} to {}".format(current_page, extend_by, current_page + extend_by))
+                        logger.debug("Found new MAL entry ({}) on page {}. Extending search from {} to {}".format(mal_id, current_page, page_range_before_extend, page_range))
             current_page += 1
 
         # if we extended past the thresholds because we found new entries
-        if page_range >= 75:
-            req_type = request_type.seventy_five
+        if page_range >= 50:
+            req_type = request_type.fifty
         elif page_range >= 25:
             req_type = request_type.twenty_five
+        elif page_range >= 12:
+            req_type = request_type.twelve
 
-        # if we looked at the first 25 or 75 pages, write time to 'state'
-        if req_type == request_type.seventy_five:
-            # write current time to 'state', 75 > 25 pages
+        # if we looked at the first 12/25/50, write time to 'state'
+        if req_type == request_type.fifty:
+            # write current time to 'state', 50 > 25 pages
             with open("state", "w") as last_scraped:
-                last_scraped.write("{}\n{}".format(int(time.time()), int(time.time())))
+                last_scraped.write("{}\n{}\n{}".format(int(time.time()), int(time.time()), int(time.time())))
         elif req_type == request_type.twenty_five:
             with open("state", "w") as last_scraped:
-                last_scraped.write("{}\n{}".format(int(time.time()), first_75_pages))
+                last_scraped.write("{}\n{}\n{}".format(int(time.time()), int(time.time()), first_50_pages))
+        elif req_type == request_type.twelve:
+            with open("state", "w") as last_scraped:
+                last_scraped.write("{}\n{}\n{}".format(int(time.time()), first_25_pages, first_50_pages))
+
 
         # download json for new elements and write to 'new' as pickles (serialized objects)
         if new_ids:
             # create list of pickled embeds
             pickles = []
             for new_id in new_ids:
-                try:
-                    logger.debug("Requesting {} from Jikan".format(new_id))
-                    anime_json_resp = make_anime_jikan_request(j, new_id, 0, None)
-                    pickles.append(make_embed(anime_json_resp))
-                except jikanpy.exceptions.JikanException:
-                    logger.warning("Failed to get {} from Jikan after 5 retries, skipping for now".format(new_id))
-                    continue
+                logger.debug("Downloading page for MAL id: {}".format(new_id))
+                pickles.append(create_embed(int(new_id), crawler, logger))
             if pickles:
                 with open("new", "wb") as new_entries:
                     pickle.dump(pickles, new_entries)
@@ -294,15 +275,15 @@ def loop(crawler, j):
 
 
 def main(init):
-    j = jikanpy.Jikan()
     if init:
+        j = jikanpy.Jikan()
         print("Initializing database with {}'s anime list".format(init))
         entries = download_anime_list(init, j)
         with open("old", "w") as old_f:
             for entry in entries:
                 old_f.write("{}\n".format(entry["mal_id"]))
     crawler = crawl(wait=8, retry_max=4)
-    loop(crawler, j)
+    loop(crawler)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
