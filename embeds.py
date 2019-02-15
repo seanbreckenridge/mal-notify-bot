@@ -36,6 +36,8 @@ def get_data(mal_id: int, ignore_image: bool, **kwargs):
     try:
         synopsis = soup.select('span[itemprop="description"]')[0].text.replace("\r", "")
         synopsis = re.sub("\n\s*\n", "\n", synopsis.strip()).strip()
+        if len(synopsis) > 400:
+            synopsis = synopsis[:400].strip() + "..."
     except: # no synopsis
         pass
 
@@ -61,76 +63,79 @@ def get_data(mal_id: int, ignore_image: bool, **kwargs):
             sfw = "Hentai" not in parent_div.text.strip()
     return name, image, synopsis, sfw, airdate, status
 
+
+def embed_value_helper(embed_dict, name):
+    """Only call this when you know that the value is in the embed, returns the value for the name"""
+    for f in embed_dict['fields']:
+        if f['name'] == name:
+            return f['value']
+
+
+def add_to_embed(discord_embed_object, embed_dict, name, value, inline):
+    if embed_dict is not None:
+        # this was already in the embed_dict
+        if name in [f['name'] for f in embed_dict['fields']]:
+            if value is not None:
+                # prefer the recent value from MAL, if it exists
+                discord_embed_object.add_field(name=name, value=value, inline=inline)
+            else:
+                # get it from the previous embed message
+                discord_embed_object.add_field(name=name, value=embed_value_helper(embed_dict, name), inline=inline)
+        # if this field wasnt in the fields previously, add it to the embed object
+        else:
+            if value is not None:
+                discord_embed_object.add_field(name=name, value=value, inline=inline)
+    # if there is no embed_dict, this is a new embed object
+    else:
+        discord_embed_object.add_field(name=name, value=value, inline=inline)
+    return discord_embed_object
+
+
 def create_embed(mal_id:int, crawler, logger):
     title, image, synopsis, sfw, airdate, status = get_data(mal_id, False, crawler=crawler, logger=logger)
     embed = discord.Embed(title=title, url="https://myanimelist.net/anime/{}".format(mal_id), color=discord.Colour.dark_blue())
-    # placeholder image on MAL
     if image is not None:
         embed.set_thumbnail(url=image)
-    embed.add_field(name="Status", value=status, inline=True)
-    if airdate is not None:
-        embed.add_field(name="Air Date", value=airdate, inline=True)
-    if synopsis is not None:
-        # truncate the synopsis past 400 characters
-        if len(synopsis) > 400:
-            embed.add_field(name="Synopsis", value=synopsis[:400] + "...", inline=False)
-        else:
-            embed.add_field(name="Synopsis", value=synopsis, inline=False)
+    embed = add_to_embed(embed, None, "Status", status, True)
+    embed = add_to_embed(embed, None, "Air Date", airdate, True)
+    embed = add_to_embed(embed, None, "Synopsis", synopsis, False)
     return embed, sfw
+
 
 def refresh_embed(embed, mal_id:int, remove_image: bool):
     title, image, synopsis, _, airdate, status = get_data(mal_id, remove_image)
     if synopsis is not None and len(synopsis) > 400:
         synopsis = synopsis[:400] + "..."
-    new_embed=discord.Embed(title=title, url=embed['url'], color=discord.Color.dark_blue())
+    new_embed=discord.Embed(title=title, url="https://myanimelist.net/anime/{}".format(mal_id), color=discord.Color.dark_blue())
     if not remove_image and image is not None:
         new_embed.set_thumbnail(url=image)
-    for f in embed['fields']:
-        if f['name'] == "Status":
-            new_embed.add_field(name="Status", value=status, inline=True)
-        elif f['name'] == "Air Date":
-            new_embed.add_field(name="Air Date", value=airdate, inline=True)
-    if synopsis is not None:
-        new_embed.add_field(name="Synopsis", value=synopsis, inline=False)
-    for f in embed['fields']:
-        if f['name'] == 'Source':
-            new_embed.add_field(name=f['name'], value=f['value'], inline=False)
+    new_embed = add_to_embed(new_embed, embed, "Status", status, True)
+    new_embed = add_to_embed(new_embed, embed, "Air Date", airdate, True)
+    new_embed = add_to_embed(new_embed, embed, "Synopsis", synopsis, False)
+    new_embed = add_to_embed(new_embed, embed, "Source", None, False)
     return new_embed
 
 def add_source(embed, valid_links):
     new_embed=discord.Embed(title=embed['title'], url=embed['url'], color=discord.Color.dark_blue())
     if 'thumbnail' in embed:
         new_embed.set_thumbnail(url=embed['thumbnail']['url'])
-    for f in embed['fields']:
-        if f['name'] == "Status":
-            new_embed.add_field(name="Status", value=f['value'], inline=True)
-        elif f['name'] == "Air Date":
-            new_embed.add_field(name="Air Date", value=f['value'], inline=True)
-        elif f['name'] == "Synopsis":
-            new_embed.add_field(name="Synopsis", value=f['value'], inline=False)
-            # if there was already a source field, replace it
-        elif f['name'] == "Source":
-            new_embed.add_field(name=f['name'], value=" ".join(valid_links), inline=False)
-            # if there wasn't a source field
-        is_new_source = "Source" not in [f['name'] for f in embed['fields']]
-        if is_new_source:
-            new_embed.add_field(name="Source", value=" ".join(valid_links), inline=False)
-        return new_embed, is_new_source
+    is_new_source = "Source" not in [f['name'] for f in embed['fields']]
+    new_embed = add_to_embed(new_embed, embed, "Status", None, True)
+    new_embed = add_to_embed(new_embed, embed, "Air Date", None, True)
+    new_embed = add_to_embed(new_embed, embed, "Synopsis", None, True)
+    new_embed = add_to_embed(new_embed, embed, "Source", " ".join(valid_links), inline=False)
+    return new_embed, is_new_source
 
 def remove_source(embed):
     new_embed=discord.Embed(title=embed['title'], url=embed['url'], color=discord.Color.dark_blue())
     if 'thumbnail' in embed:
         new_embed.set_thumbnail(url=embed['thumbnail']['url'])
-    for f in embed['fields']:
-        if f['name'] == "Status":
-            new_embed.add_field(name="Status", value=f['value'], inline=True)
-        elif f['name'] == "Air Date":
-            new_embed.add_field(name="Air Date", value=f['value'], inline=True)
-        elif f['name'] == "Synopsis":
-            new_embed.add_field(name="Synopsis", value=f['value'], inline=False)
+    new_embed = add_to_embed(new_embed, embed, "Status", None, True)
+    new_embed = add_to_embed(new_embed, embed, "Air Date", None, True)
+    new_embed = add_to_embed(new_embed, embed, "Synopsis", None, False)
     return new_embed
 
-# basic test
+# basic test to see what data is returned from MAL
 if __name__ == "__main__":
     import sys
     mid = int(sys.argv[1])
