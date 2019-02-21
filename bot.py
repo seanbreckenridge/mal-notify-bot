@@ -85,10 +85,11 @@ async def add_new_entries():
         old_f.write("\n".join(old_entries))
     os.remove("new") # remove new entries file as we've logged them
 
+
 @client.command(pass_context=True)
 async def print_logs(ctx, num_lines: int):
     if not ctx.message.author.server_permissions.administrator:
-        await client.say("This command can only be run my administrators")
+        await client.say("This command can only be run by administrators")
         return
 
     # get the number of lines specificed by user
@@ -212,9 +213,56 @@ async def refresh(ctx, mal_id: int):
             return
     await client.say("Could not find a message that conatins the MAL id {} in {}".format(mal_id, feed_channel.mention))
 
+
+@client.command(pass_context=True)
+async def check(ctx, mal_username, num: int):
+    leftover_args = " ".join(ctx.message.content.strip().split()[4:])
+    print_all = "all" in leftover_args.lower()
+    url = "https://myanimelist.net/animelist/{}/load.json?offset=0&order=5&status=7".format(mal_username)
+    resp = requests.get(url)
+    if not resp.status_code == requests.codes.ok:
+        await client.say("There was a {} error trying to connect to <{}>. Try again in a few moments...".format(resp.status_code, url))
+        return
+    json_data = resp.json()
+    parsed = {}
+    for e in json_data:
+        parsed[str(e['anime_id'])] = str(e['status'])
+    found_entry = False # mark True if we find an entry the user hasnt watched
+    async for message in client.logs_from(feed_channel, limit=num, reverse=True):
+        try:
+            embed = message.embeds[0]
+        except Exception as e:
+            continue
+        source_exists = "Source" in [f['name'] for f in embed['fields']]
+        if source_exists or print_all:
+            m = re.search("https:\/\/myanimelist\.net\/anime\/(\d+)", embed['url'])
+            mal_id = m.group(1)
+            on_your_list = mal_id in parsed
+            on_your_ptw = mal_id in parsed and parsed[mal_id] == "6"
+            if (not on_your_list) or (on_your_ptw and source_exists):
+                found_entry = True
+                if source_exists:
+                    fixed_urls = " ".join(["<{}>".format(url) for url in [f['value'] for f in embed['fields'] if f['name'] == "Source"][0].split()])
+                    if on_your_ptw:
+                        await client.say("{} is on your PTW, but it has a source: {}".format(embed['url'], fixed_urls))
+                    else:
+                        await client.say("{} isn't on your list, but it has a source: {}".format(embed['url'], fixed_urls))
+                else:
+                    await client.say("{} isn't on your list.".format(embed['url']))
+
+        if not found_entry:
+            client.say("I couldn't find any MAL entries in the last {} that you haven't watched yet".format(num))
+
+
 @client.command()
 async def help():
     help_str = "**User commands**:\n`help`: describe commands\n" + \
+               "`check`: checks if you've watched the 'n' most recent entries in {}\n".format(feed_channel.mention) + \
+               "\tSyntax: `@notify check <mal_username> <n>`" + \
+               "\n\tExample `@notify check purplepinapples 10`\n" + \
+               "\tNote: This only checks your 300 most recent entries.\n" + \
+               "\tBy default, this will only print entries that have sources, provide the `all` keyword to make it check all entries:\n" + \
+               "\t\tExample: `@notify check purplepinapples 10 all`\n" + \
                "**Trusted commands**:\n" + \
                "`source`: Adds a link to a embed in {}\n\tSyntax: `@notify source <mal_id> <link>`".format(feed_channel.mention) + \
                "\n\tExample: `@notify source 32287 https://www.youtube.com/watch?v=1RzNDZFQllA`\n" + \
@@ -252,6 +300,13 @@ async def on_command_error(error, ctx):
             int(args[1])
         except ValueError:
             await client.send_message(ctx.message.channel, "Error converting `{}` to an integer.".format(args[1]))
+    elif isinstance(error, commands.MissingRequiredArgument) and command_name == "check":
+        await client.send_message(ctx.message.channel, "Provide your MAL username and then the number of entries in {} you want to check".format(feed_channel.mention))
+    elif isinstance(error, commands.BadArgument) and command_name == "check":
+        try:
+            int(args[2])
+        except:
+            await client.send_message(ctx.message.channel, "Error converting `{}` to an integer.".format(args[2]))
     elif isinstance(error, errors.HTTPException):
         await client.send_message(ctx.message.channel, "There was an issue connecting to the Discord API. Wait a few moments and try again.")
     else:
