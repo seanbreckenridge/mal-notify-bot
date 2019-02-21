@@ -250,8 +250,8 @@ async def check(ctx, mal_username, num: int):
                 else:
                     await client.say("{} isn't on your list.".format(embed['url']))
 
-        if not found_entry:
-            client.say("I couldn't find any MAL entries in the last {} that you haven't watched yet".format(num))
+    if not found_entry:
+        await client.say("I couldn't find any MAL entries in the last {} entries that aren't on your list.".format(num))
 
 
 @client.command()
