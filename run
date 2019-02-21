@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 
 # cd into this directory
-mypath=`realpath $0`
-cd `dirname $mypath`
-pwd
+notify_dir=`realpath $0`
+cd `dirname $notify_dir`
 while true
 do
     python3 bot.py # run the bot
