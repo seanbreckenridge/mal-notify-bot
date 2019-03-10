@@ -16,6 +16,8 @@ This is run on `Python 3.5.3`
 
 Run:
 
+`git clone https://github.com/purplepinapples/mal-notify-bot` the repo
+
 `cd` into the directory
 
 put your bots token in a file named `token.yaml` with contents like:
@@ -24,4 +26,4 @@ put your bots token in a file named `token.yaml` with contents like:
 
 `./run` to start
 
-Note the names of the channels were `bot.py` posts new links are hard coded, as `feed` and `nsfw-feed`, you can change those [here](https://github.com/purplepinapples/mal-notify-bot/blob/master/bot.py#L45).
+Note the names of the channels where `bot.py` posts new links are hard coded, as `feed` and `nsfw-feed`, you can change those [here](https://github.com/purplepinapples/mal-notify-bot/blob/master/bot.py#L45).
