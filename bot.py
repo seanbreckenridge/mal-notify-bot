@@ -94,10 +94,9 @@ async def print_logs(ctx, num_lines: int):
 
     # get the number of lines specificed by user
     log_str = ""
-    for file in sorted(glob.glob("*.log"), key=os.path.getmtime):
-        if num_lines <= 0:
-            break
-        with open(file, 'r') as f:
+    last_log_file = sorted(glob.glob("*.log"), key=lambda x: int(x.rstrip(".log")))[-1]
+    if num_lines > 0:
+        with open(last_log_file, 'r') as f:
             lines = f.readlines()
             if len(lines) < num_lines:
                 log_str += "".join(lines)
