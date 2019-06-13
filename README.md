@@ -4,7 +4,7 @@ A discord bot that checks the [Just Added](https://myanimelist.net/anime.php?o=9
 
 <img src="https://i.imgur.com/pEVk0iw.png" alt="" width=400>
 
-You can join the discord server this is run on [here](https://goo.gl/ciydwZ).
+You can join the discord server this is run on [here](https://goo.gl/ciydwZ). If that link doesn't work, feel free to add me at `PurplePinapples#3673` on discord and I can give you an invite.
 
 Depedencies:
 ```
