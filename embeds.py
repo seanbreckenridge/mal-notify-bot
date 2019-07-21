@@ -117,6 +117,8 @@ def refresh_embed(embed, mal_id:int, remove_image: bool):
 
 def add_source(embed, valid_links):
     new_embed=discord.Embed(title=embed['title'], url=embed['url'], color=discord.Color.dark_blue())
+    print(embed)
+    print("thumbnail in embed:", 'thumbnail' in embed)        
     if 'thumbnail' in embed:
         new_embed.set_thumbnail(url=embed['thumbnail']['url'])
     is_new_source = "Source" not in [f['name'] for f in embed['fields']]

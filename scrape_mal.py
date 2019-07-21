@@ -97,6 +97,7 @@ class crawl:
         return self.get(url).json()
 
     def get_just_added_page(self, page_number):
+        logger.debug("Requesting page {}".format(page_number))
         return BeautifulSoup(self.get_html(just_added_page(page_number)), 'html.parser')
 
 
@@ -191,7 +192,8 @@ def loop(crawler):
         first_12_pages = first_25_pages = first_50_pages = 0
         page_range = 2
         req_type = request_type.two
-
+        
+        logger.debug("Checking state")
         # read times from 'state' file
         if os.path.exists("state"):
             with open("state", "r") as last_scraped:
@@ -223,6 +225,7 @@ def loop(crawler):
         current_page = 0
         while current_page < page_range:
             page_ids = []
+            logger.debug("Checking page {}".format(current_page))
             mal_ids = list(get_ids_from_search_page(current_page, crawler))
             for mal_id in mal_ids:
                 # if this is a new entry
