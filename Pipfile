@@ -1,0 +1,17 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+
+[packages]
+pyyaml = "*"
+requests = "*"
+discord-py = ">=1.2.3"
+gitpython = "*"
+jikanpy = {editable = true,git = "https://github.com/AWConant/jikanpy",ref = "master"}
+backoff = "*"
+
+[requires]
+python_version = "3.6"

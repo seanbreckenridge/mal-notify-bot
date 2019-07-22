@@ -6,6 +6,7 @@ state
 old
 new
 pid
+mal-id-cache/
 
 # Emacs
 
@@ -137,4 +138,3 @@ dmypy.json
 .venv/
 
 # End of https://www.gitignore.io/api/python
-

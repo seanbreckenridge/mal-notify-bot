@@ -6,24 +6,21 @@ A discord bot that checks the [Just Added](https://myanimelist.net/anime.php?o=9
 
 You can join the discord server this is run on [here](https://goo.gl/ciydwZ). If that link doesn't work, scroll down to the bottom of your servers, hit "Add a Server" > "Join a server" and type in `ajABjeN`.
 
-Depedencies:
+Install:
+
 ```
-pip3 install --user git+git://github.com/AWConant/jikanpy.git
-pip3 install --user PyYaml requests discord.py bs4
+https://github.com/seanbreckenridge/mal-notify-bot
+cd mal-notify-bot
+pipenv install
+git clone https://github.com/seanbreckenridge/mal-id-cache
 ```
 
-This is run on `Python 3.5.3`
-
-Run:
-
-`git clone https://github.com/purplepinapples/mal-notify-bot` the repo
-
-`cd` into the directory
-
-put your bots token in a file named `token.yaml` with contents like:
+put your bots token in a file named `token.yaml` in `mal-notify-bot` with contents like:
 
 `token: !!str EU*#3eiSzEr7i4L36FaTlrV0*RtuGOBVNrcteyrtt$GPAwNtkJKQg*dweSLy`
 
-`./run` to start
+`python3 bot.py` to start
 
-Note the names of the channels where `bot.py` posts new links are hard coded, as `feed` and `nsfw-feed`, you can change those [here](https://github.com/purplepinapples/mal-notify-bot/blob/master/bot.py#L45).
+This is run on `python 3.6`. You can use [pyenv](https://github.com/pyenv/pyenv) to install another version of python if needed.
+
+Note: the names of the channels where `bot.py` posts new links are hard coded, as `feed` and `nsfw-feed`, you can change those in `on_ready` in `bot.py`

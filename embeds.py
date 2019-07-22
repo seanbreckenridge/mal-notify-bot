@@ -1,80 +1,53 @@
 import re
 
-import bs4
 import discord
 import requests
+import jikanpy
+import backoff
 
-# can't use Jikan here since API requests are cached for 6 hours, and
-# the whole point of this is to be relevant as entries come out
+j = jikanpy.Jikan("http://localhost:8000/v3/")
 
-# image, synopsis, whether this is SFW, air date, status
-def get_data(mal_id: int, ignore_image: bool, **kwargs):
-    name = image = synopsis = sfw = airdate = status = soup = None
-    crawler = kwargs.get('crawler', None)
+@backoff.on_exception(
+    backoff.fibo,  # fibonacci sequence backoff
+    (jikanpy.exceptions.JikanException,
+     jikanpy.exceptions.APIException),
+    max_tries=10,
+    )
+def get_data(mal_id:int, ignore_image: bool, **kwargs):
+    name = image = synopsis = sfw = airdate = status = None
     logger = kwargs.get('logger', None)
-    if crawler is None:
-        soup = bs4.BeautifulSoup(requests.get("https://myanimelist.net/anime/{}".format(mal_id)).text, "html.parser")
-    else:
-        soup = bs4.BeautifulSoup(crawler.get_html("https://myanimelist.net/anime/{}".format(mal_id)), "html.parser")
+    resp = j.anime(mal_id)
     if logger is not None:
         logger.debug("Generating embed for MAL id: {}".format(mal_id))
-    # name
-    name, dash, homepage = soup.title.string.rpartition("-")
-    name = name.strip()
 
-    # image
+    name = resp['title']
     if not ignore_image:
-        try:
-            image = soup.select("tr > td.borderClass > div > div > a > img.ac")[0]["src"]
-            # placeholder MAL logo image
-            if image.startswith("https://myanimelist.cdn-dena.com/img/sp/icon/"):
-                image = None
-        except:
-            pass
-
-    # synopsis
-    try:
-        synopsis = soup.select('span[itemprop="description"]')[0].text.replace("\r", "")
+        image = resp['image_url']
+    if image.startswith("https://myanimelist.cdn-dena.com/img/sp/icon/"):
+        image = None
+    synopsis = resp.get("synopsis", None)
+    if synopsis is not None:
+        synopsis.replace("\r", "")
         synopsis = re.sub("\n\s*\n", "\n", synopsis.strip()).strip()
         if len(synopsis) > 400:
             synopsis = synopsis[:400].strip() + "..."
-    except: # no synopsis
-        pass
-
-    # sidebar
-    # select this by selecting the "score" div, moving up one level and then getting all elements in the sidebar
-    sidebar_titles = list(soup.select("div.js-statistics-info")[0].parent.select("div > span"))
-    for title in sidebar_titles:
-        title_str = title.text.strip()
-        if title_str == "Aired:":
-            parent_div = title.parent
-            # remove inner span title
-            title.decompose()
-            airdate = parent_div.text.strip()
-            if airdate == "Not available":
-                airdate = None
-        elif title_str == "Status:":
-            parent_div = title.parent
-            title.decompose()
-            status = parent_div.text.strip()
-        elif title_str == "Genres:":
-            parent_div = title.parent
-            title.decompose()
-            sfw = "Hentai" not in parent_div.text.strip()
+    status = resp["status"]
+    airdate = resp["aired"].get("string", None)
+    sfw = 12 not in [g['mal_id'] for g in resp['genres']]
     return name, image, synopsis, sfw, airdate, status
 
 
 def embed_value_helper(embed_dict, name):
     """Only call this when you know that the value is in the embed, returns the value for the name"""
-    for f in embed_dict['fields']:
-        if f['name'] == name:
-            return f['value']
+    for f in embed_dict.fields:
+        if f.name == name:
+            return f.value
 
 
 def add_to_embed(discord_embed_object, embed_dict, name, value, inline):
     if embed_dict is not None:
         # this was already in the embed_dict
-        if name in [f['name'] for f in embed_dict['fields']]:
+        if name in [f.name for f in embed_dict.fields]:
             if value is not None:
                 # prefer the recent value from MAL, if it exists
                 discord_embed_object.add_field(name=name, value=value, inline=inline)
@@ -91,14 +64,14 @@ def add_to_embed(discord_embed_object, embed_dict, name, value, inline):
     return discord_embed_object
 
 
-def create_embed(mal_id:int, crawler, logger):
-    title, image, synopsis, sfw, airdate, status = get_data(mal_id, False, crawler=crawler, logger=logger)
+def create_embed(mal_id:int, logger):
+    title, image, synopsis, sfw, airdate, status = get_data(mal_id, False, logger=logger)
     embed = discord.Embed(title=title, url="https://myanimelist.net/anime/{}".format(mal_id), color=discord.Colour.dark_blue())
     if image is not None:
         embed.set_thumbnail(url=image)
-    embed = add_to_embed(embed, None, "Status", status, True)
-    embed = add_to_embed(embed, None, "Air Date", airdate, True)
-    embed = add_to_embed(embed, None, "Synopsis", synopsis, False)
+    embed = add_to_embed(embed, None, "Status", status, inline=True)
+    embed = add_to_embed(embed, None, "Air Date", airdate, inline=True)
+    embed = add_to_embed(embed, None, "Synopsis", synopsis, inline=False)
     return embed, sfw
 
 
@@ -109,32 +82,31 @@ def refresh_embed(embed, mal_id:int, remove_image: bool):
     new_embed=discord.Embed(title=title, url="https://myanimelist.net/anime/{}".format(mal_id), color=discord.Color.dark_blue())
     if not remove_image and image is not None:
         new_embed.set_thumbnail(url=image)
-    new_embed = add_to_embed(new_embed, embed, "Status", status, True)
-    new_embed = add_to_embed(new_embed, embed, "Air Date", airdate, True)
-    new_embed = add_to_embed(new_embed, embed, "Synopsis", synopsis, False)
-    new_embed = add_to_embed(new_embed, embed, "Source", None, False)
+    new_embed = add_to_embed(new_embed, embed, "Status", status, inline=True)
+    new_embed = add_to_embed(new_embed, embed, "Air Date", airdate, inline=True)
+    new_embed = add_to_embed(new_embed, embed, "Synopsis", synopsis, inline=False)
+    new_embed = add_to_embed(new_embed, embed, "Source", None, inline=False)
     return new_embed
 
 def add_source(embed, valid_links):
-    new_embed=discord.Embed(title=embed['title'], url=embed['url'], color=discord.Color.dark_blue())
-    print(embed)
-    print("thumbnail in embed:", 'thumbnail' in embed)        
-    if 'thumbnail' in embed:
-        new_embed.set_thumbnail(url=embed['thumbnail']['url'])
-    is_new_source = "Source" not in [f['name'] for f in embed['fields']]
-    new_embed = add_to_embed(new_embed, embed, "Status", None, True)
-    new_embed = add_to_embed(new_embed, embed, "Air Date", None, True)
-    new_embed = add_to_embed(new_embed, embed, "Synopsis", None, True)
+    new_embed=discord.Embed(title=embed.title, url=embed.url, color=discord.Color.dark_blue())
+    if hasattr(embed, "thumbnail"):
+        new_embed.set_thumbnail(url=embed.thumbnail.url)
+    is_new_source = "Source" not in [f.name for f in embed.fields]
+    new_embed = add_to_embed(new_embed, embed, "Status", None, inline=True)
+    new_embed = add_to_embed(new_embed, embed, "Air Date", None, inline=True)
+    new_embed = add_to_embed(new_embed, embed, "Synopsis", None, inline=True)
     new_embed = add_to_embed(new_embed, embed, "Source", " ".join(valid_links), inline=False)
     return new_embed, is_new_source
 
 def remove_source(embed):
-    new_embed=discord.Embed(title=embed['title'], url=embed['url'], color=discord.Color.dark_blue())
-    if 'thumbnail' in embed:
-        new_embed.set_thumbnail(url=embed['thumbnail']['url'])
-    new_embed = add_to_embed(new_embed, embed, "Status", None, True)
-    new_embed = add_to_embed(new_embed, embed, "Air Date", None, True)
-    new_embed = add_to_embed(new_embed, embed, "Synopsis", None, False)
+    new_embed=discord.Embed(title=embed.title, url=embed.url, color=discord.Color.dark_blue())
+
+    if hasattr(embed, "thumbnail"):
+        new_embed.set_thumbnail(url=embed.thumbnail.url)
+    new_embed = add_to_embed(new_embed, embed, "Status", None, inline=True)
+    new_embed = add_to_embed(new_embed, embed, "Air Date", None, inline=True)
+    new_embed = add_to_embed(new_embed, embed, "Synopsis", None, inline=False)
     return new_embed
 
 # basic test to see what data is returned from MAL
