@@ -97,7 +97,11 @@ def loop():
 
 def main():
     update_git_repo()
-    loop()
+    while True:
+        try:
+            loop()
+        except Exception as e:
+            logger.error(str(e), exc_info=True)
 
 if __name__ == "__main__":
     main()
