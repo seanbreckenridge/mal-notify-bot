@@ -90,7 +90,7 @@ async def add_new_entries():
             m = re.search("https:\/\/myanimelist\.net\/anime\/(\d+)", new.url)
             # verify that it got printed
             check_channel = feed_channel if sfw else nsfw_feed_channel
-            async for message in check_channel.history(limit=3, oldest_first=False):
+            async for message in check_channel.history(limit=10, oldest_first=False):
                 try:
                     embed = message.embeds[0]
                     embed_id = re.search("https:\/\/myanimelist\.net\/anime\/(\d+)", embed.url)
