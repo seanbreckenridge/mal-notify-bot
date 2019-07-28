@@ -88,8 +88,17 @@ async def add_new_entries():
             else:
                 await nsfw_feed_channel.send(embed=new)
             m = re.search("https:\/\/myanimelist\.net\/anime\/(\d+)", new.url)
-            old_entries.add(m.group(1))
-            sleep(1)
+            # verify that it got printed
+            check_channel = feed_channel if sfw else nsfw_feed_channel
+            async for message in check_channel.history(limit=3, oldest_first=False):
+                try:
+                    embed = message.embeds[0]
+                    embed_id = re.search("https:\/\/myanimelist\.net\/anime\/(\d+)", embed.url)
+                    if m.group(1) == embed_id.group(1):
+                        old_entries.add(m.group(1))
+                        break
+                except Exception as e: # i.e. test_log messages that don't have embeds
+                    continue
     with open("old", 'w') as old_f:
         old_f.write("\n".join(old_entries))
     os.remove("new") # remove new entries file as we've logged them
