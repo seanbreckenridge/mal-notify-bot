@@ -19,6 +19,8 @@ put your bots token in a file named `token.yaml` in `mal-notify-bot` with conten
 
 `token: !!str EU*#3eiSzEr7i4L36FaTlrV0*RtuGOBVNrcteyrtt$GPAwNtkJKQg*dweSLy`
 
+This uses a local [jikan](https://github.com/jikan-me/jikan-rest) instance hosted on port 8000.
+
 `python3 bot.py` to start
 
 This is run on `python 3.6`. You can use [pyenv](https://github.com/pyenv/pyenv) to install another version of python if needed.
