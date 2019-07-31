@@ -5,6 +5,7 @@ import time
 import glob
 import pickle
 import logging
+from functools import wraps
 
 import yaml
 import requests
@@ -23,6 +24,17 @@ with open('token.yaml', 'r') as t:
     token = yaml.load(t, Loader=yaml.FullLoader)["token"]
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s: %(message)s')
+logger = logging.getLogger(__name__)
+LOGLEVEL = os.environ.get("LOGLEVEL", "INFO")
+logger.setLevel(LOGLEVEL)
+fh = logging.FileHandler(os.path.join(logs_dir, "{}.log".format(os.getpid())))
+# format
+formatter = logging.Formatter("%(asctime)s %(levelno)s %(process)d %(message)s")
+fh.setFormatter(formatter)
+# log to stderr
+logger.addHandler(logging.StreamHandler(sys.stdout))
+# and to the log file
+logger.addHandler(fh)
 
 #  start client
 client = commands.Bot(command_prefix=commands.when_mentioned, case_insensitive=False)
@@ -32,6 +44,67 @@ period = 60  # how often (in seconds) to check if there are new entries
 
 feed_channel = None
 nsfw_feed_channel = None
+old_db = None
+new_pickles = None
+
+class uuid:
+    """Represents function calls as processes so its easier to find out when they start/end"""
+    id = 0
+
+    @staticmethod
+    def get():
+        id += 1
+        return id
+    
+
+def log(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        id = uuid.get()
+        logging.debug(f"{func.__name__} (f{id}) called")
+        result = f(*args, **kwargs)
+        logging.debug(f"{func.__name__} (f{id}) finished")
+        return result
+    return wrapper
+
+class ScrapeProcessManager():
+    """Manage tracking the current mal.py process"""
+
+    def __init__(self, *, filepath="pid", mal_fp="mal.py"):
+        self.filepath = filepath
+        self.process_filepath = mal_fp
+        self.pid = None
+
+    @log
+    def poll(self):
+        if not self.file_exists():
+            return self._call_process()
+        else:
+            self.read_from_pid_file()
+            if not self.check_pid():
+                return self._call_process()
+        
+    @log
+    def read_from_pid_file():
+        with open(self.filepath, 'r') as pid_f:
+            self.pid = int(pid_f.read())
+
+    @log
+    def _call_process():
+        os.system("python3 {} &".format(self.process_filepath))
+
+    def file_exists(self):
+        return os.path.exists(self.filepath)    
+
+    @log
+    def check_pid():
+        try:
+            os.kill(self.pid, 0)
+        except OSError:
+            return False
+        else:
+            return True
+        
 
 # https://stackoverflow.com/a/568285
 def check_pid(pid):
@@ -43,14 +116,61 @@ def check_pid(pid):
     else:
         return True
 
+
+class OldDatabase():
+    """Models and interacts with the 'old' database file"""
+    
+    def __init__(self, *, filepath="old"):
+        self.filepath = filepath
+
+    @log
+    def read():
+        with open(self.filepath, 'r') as old_f:
+            old_entries = set(old_f.read().splitlines())
+        return old_entries
+
+    @log
+    def dump(contents):
+        contents = sorted(list(contents), key=int)
+        with open(self.filepath, 'w') as old_f:
+            old_f.write("\n".join(contents))
+
+    def file_exists():
+        return os.path.exists(self.filepath)
+
+
+def NewPickles():
+    """Models and interacts with the 'new' pickles file"""
+
+    def __init__(self, *, filepath="new"):
+        self.filepath = filepath
+
+    @log
+    def read():
+        with open(self.filepath, 'rb') as new_f:
+            pickles = pickle.load(new_f)
+        return pickles
+
+    def file_exists():
+        return os.path.exists(self.filepath)
+
 @client.event
+@log
 async def on_ready():
     global feed_channel
     global nsfw_feed_channel
+    global old_db
+    global new_pickles
     channels = list(iter(client.guilds))[0].channels
     feed_channel = get(channels, name="feed")
     nsfw_feed_channel = get(channels, name="nsfw-feed")
-    print("ready!")
+    old_db = OldDatabase(filepath="old")
+    new_pickles = NewPickles(filepath="new")
+
+@client.event
+@log
+async def on_resumed():
+    pass
 
 # override on_message so we can remove double spaces after the bot name, which would ordinarily not trigger commands
 @client.event
@@ -59,6 +179,7 @@ async def on_message(message):
     await client.process_commands(message)
 
 # this is run in event loop, see bottom of file
+@log
 async def loop():
     while not client.is_ready():
         await sleep(1)
@@ -75,6 +196,9 @@ async def loop():
     if os.path.exists("new"):
         await add_new_entries()
     await sleep(period) # check for 'new' file periodically
+
+
+    
 
 async def add_new_entries():
     with open("new", 'rb') as new_f:
@@ -298,3 +422,4 @@ async def on_command_error(ctx, error):
 
 client.loop.create_task(loop())
 client.run(token, bot=True, reconnect=True)
+
