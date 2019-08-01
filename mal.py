@@ -12,14 +12,14 @@ import json
 import git
 import requests
 
-from utils import *
+from utils import setup_logger
 from utils.embeds import create_embed
 
 
 root_dir = os.path.abspath(os.path.dirname(__file__))
 mal_id_cache_dir = os.path.join(root_dir, "mal-id-cache")
 
-logger = setup_logger(__name__, "mal")
+logger = setup_logger(__name__, "mal", supress_stream_output=True)
 
 def update_git_repo():
     """Updates from the remote mal-id-cache"""

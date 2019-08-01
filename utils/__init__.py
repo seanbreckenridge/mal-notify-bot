@@ -18,7 +18,7 @@ class uuid:
         return id
 
 # provide stream = None to not print to stdout/stderr
-def setup_logger(name, logfile_name, *, stream=sys.stderr):
+def setup_logger(name, logfile_name, supress_stream_output=False):
     # setup logs directory
     logs_dir = os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)), "logs")
     if not os.path.exists(logs_dir):
@@ -30,8 +30,8 @@ def setup_logger(name, logfile_name, *, stream=sys.stderr):
     fh = logging.FileHandler(os.path.join(logs_dir, logfile_name + ".log"))
     fh.setFormatter(formatter)
     logger.addHandler(fh)
-    if stream is not None:
-        sh = logging.StreamHandler(stream)
+    if supress_stream_output:
+        sh = logging.StreamHandler()
         logger.addHandler(sh)
     return logger
 

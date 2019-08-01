@@ -20,12 +20,16 @@ from utils import *
 from utils.embeds import refresh_embed, add_source, remove_source
 from utils.user import download_users_list
 
+# setup project and discord.py logs
 logger = setup_logger(__name__, "bot")
+logging.basicConfig()
+discord_logs = logging.getLogger("discord")
+discord_logs.setLevel(logging.INFO)
 
 def log(func):
     """Decorator for functions, to log start/end times"""
     @wraps(func)
-    def wrapper(*args, **kwargs):
+    async def wrapper(*args, **kwargs):
         id = uuid.get_and_increment()
         logger.debug(f"{func.__name__} (f{id}) called")
         if inspect.iscoroutinefunction(func):
@@ -54,7 +58,7 @@ class IdProcessManager(FileState):
         manager_python_file: file that manages pulling new IDs from github and creating pickle embeds
         """
         super().__init__(filepath)
-        self.process_filepath = mal_fp
+        self.process_filepath = manager_python_file
         self.pid = None
 
     @log
@@ -150,11 +154,11 @@ class MalNotifyBot(commands.Bot):
         self.process_manager = None
         self.period = 60  # how often (in seconds) to check if there are new entries
         super().__init__(*args, **kwargs)
-        self.loop_check = self.loop.create_task(self.loop())
+        self.loop_check = self.loop.create_task(self.print_loop())
 
 
     async def on_ready(self):
-        guilds = list(iter(client.guilds))
+        guilds = list(iter(self.guilds))
         if len(guilds) != 1:
             logger.critical("This bot should only be used on one server")
             await self.logout()
@@ -169,7 +173,6 @@ class MalNotifyBot(commands.Bot):
         self.old_db = OldDatabase(filepath="old")
         self.new_entries = NewEntries(filepath="new")
         self.process_manager = IdProcessManager(filepath="pid", manager_python_file="mal.py")
-        self.process_manager.poll()
 
 
     # override on_message so we can remove double spaces after the bot name,
@@ -197,7 +200,7 @@ class MalNotifyBot(commands.Bot):
 
     # run in event loop
     @log
-    async def loop():
+    async def print_loop():
         await self.wait_until_ready()
         while not self.is_closed():
             # check if scraper is running
@@ -233,7 +236,7 @@ class MalNotifyBot(commands.Bot):
     @commands.command()
     @has_privilege()
     @log
-    async def add_new(ctx):
+    async def add_new(self, ctx):
         if self.new_entries.file_exists():
             await self.add_new_entries()
         else:
@@ -242,16 +245,17 @@ class MalNotifyBot(commands.Bot):
 
     @commands.command()
     @log
-    @is_admin_or_owner
-    async def test_log(ctx):
-        await client.send_message(feed_channel, "test message. beep boop")
-        await client.send_message(nsfw_feed_channel, "test message. beep boop")
+    @is_admin_or_owner()
+    async def test_log(self, ctx):
+        message = "test message. beep boop"
+        await self.feed_channel.send(message)
+        await self.nsfw_feed_channel.send(message)
 
 
     @commands.command()
     @log
     @has_privilege()
-    async def source(ctx, mal_id: int, *, links):
+    async def source(self, ctx, mal_id: int, *, links):
 
         adding_source = True
         if links.strip().lower() == "remove":
@@ -291,7 +295,7 @@ class MalNotifyBot(commands.Bot):
     @commands.command()
     @log
     @has_privilege()
-    async def refresh(ctx, mal_id: int):
+    async def refresh(self, ctx, mal_id: int):
         remove_image = "remove image" in ctx.message.content.lower()
         message = await self.search_feed_for_mal_id(str(mal_id), feed_channel, limit=999999)
         if not message:
@@ -304,7 +308,7 @@ class MalNotifyBot(commands.Bot):
 
     @commands.command()
     @log
-    async def check(ctx, mal_username, num: int):
+    async def check_list(self, ctx, mal_username, num: int):
         # the request.get calls are synchronous - blocking, figure out a better way to implement this
         return await ctx.channel.send("This command is currently disabled.")
         leftover_args = " ".join(ctx.message.content.strip().split()[4:])
@@ -343,7 +347,7 @@ class MalNotifyBot(commands.Bot):
 
 
     @commands.command()
-    async def help(ctx):
+    async def help(self, ctx):
        #"`check`: checks if you've watched the 'n' most recent entries in {}\n".format(feed_channel.mention) + \
        #"\tSyntax: `@notify check <mal_username> <n>`" + \
        #"\n\tExample `@notify check purplepinapples 10`\n" + \
@@ -362,8 +366,10 @@ class MalNotifyBot(commands.Bot):
         await ctx.channel.send(help_str)
 
 
-    async def on_command_error(ctx, error):
+    async def on_command_error(self, ctx, error):
 
+        import pdb; pdb.set_trace()
+        
         command_name = ctx.command.name
         clean_message_content = ctx.message.content.split(">", maxsplit=1)[1].strip().replace("`", '')
         args = clean_message_content.split()
