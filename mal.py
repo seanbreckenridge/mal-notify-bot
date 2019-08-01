@@ -12,34 +12,14 @@ import json
 import git
 import requests
 
-from embeds import create_embed
+from utils import *
+from utils.embeds import create_embed
 
-# logs are good, use them
-# Note logging levels go:
-# DEBUG
-# INFO
-# WARNING
-# ERROR (only in catch blocks, and with exc_info)
-# CRITICAL
 
 root_dir = os.path.abspath(os.path.dirname(__file__))
-logs_dir = os.path.join(root_dir, "logs")
-
-if not os.path.exists(logs_dir):
-    os.makedirs(logs_dir)
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-fh = logging.FileHandler(os.path.join(logs_dir, "{}.log".format(os.getpid())))
-# format
-formatter = logging.Formatter("%(asctime)s %(levelno)s %(process)d %(message)s")
-fh.setFormatter(formatter)
-# log to stderr
-# logger.addHandler(logging.StreamHandler())
-# and to the log file
-logger.addHandler(fh)
-
 mal_id_cache_dir = os.path.join(root_dir, "mal-id-cache")
+
+logger = setup_logger(__name__, "mal")
 
 def update_git_repo():
     """Updates from the remote mal-id-cache"""
@@ -82,7 +62,7 @@ def loop():
         # create list of pickled embeds
         pickles = []
         for new_id in new_ids:
-            logger.debug("Downloading page for MAL id: {}".format(new_id))
+            logger.info("Downloading page for MAL id: {}".format(new_id))
             pickles.append(create_embed(int(new_id), logger))
         if pickles:
             with open("new", "wb") as new_entries:
@@ -91,7 +71,7 @@ def loop():
         with open('old', 'w') as old_f:
             old_f.write("\n".join(map(str, ids)))
 
-    logger.debug("Sleeping for 10m")
+    logger.info("Sleeping for 10m")
     time.sleep(600)
 
 
