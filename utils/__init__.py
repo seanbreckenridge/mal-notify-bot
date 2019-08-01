@@ -6,16 +6,16 @@ import logging
 
 class uuid:
     """Represents function calls as processes so its easier to track where/when they start/end"""
-    id = 0
+    _id = 0
 
     @staticmethod
     def get():
-        return id
+        return uuid._id
 
     @staticmethod
     def get_and_increment():
-        id += 1
-        return id
+        uuid._id += 1
+        return uuid._id
 
 # provide stream = None to not print to stdout/stderr
 def setup_logger(name, logfile_name, supress_stream_output=False):
@@ -24,14 +24,15 @@ def setup_logger(name, logfile_name, supress_stream_output=False):
     if not os.path.exists(logs_dir):
         os.makedirs(logs_dir)
     logger = logging.getLogger(name)
-    LOGLEVEL = os.environ.get("LOGLEVEL", "INFO")
+    LOGLEVEL = os.environ.get("LOGLEVEL", "DEBUG")
     logger.setLevel(LOGLEVEL)
     formatter = logging.Formatter("%(asctime)s %(levelno)s %(process)d %(message)s")
     fh = logging.FileHandler(os.path.join(logs_dir, logfile_name + ".log"))
     fh.setFormatter(formatter)
     logger.addHandler(fh)
-    if supress_stream_output:
+    if not supress_stream_output:
         sh = logging.StreamHandler()
+        sh.setFormatter(formatter)
         logger.addHandler(sh)
     return logger
 

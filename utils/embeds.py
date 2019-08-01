@@ -75,8 +75,8 @@ def create_embed(mal_id:int, logger):
     return embed, sfw
 
 
-def refresh_embed(embed, mal_id:int, remove_image: bool):
-    title, image, synopsis, _, airdate, status = get_data(mal_id, remove_image)
+def refresh_embed(embed, mal_id:int, remove_image: bool, logger):
+    title, image, synopsis, _, airdate, status = get_data(mal_id, remove_image, logger=logger)
     if synopsis is not None and len(synopsis) > 400:
         synopsis = synopsis[:400] + "..."
     new_embed=discord.Embed(title=title, url="https://myanimelist.net/anime/{}".format(mal_id), color=discord.Color.dark_blue())
@@ -89,6 +89,7 @@ def refresh_embed(embed, mal_id:int, remove_image: bool):
     return new_embed
 
 def add_source(embed, valid_links):
+    print("Hi!")
     new_embed=discord.Embed(title=embed.title, url=embed.url, color=discord.Color.dark_blue())
     if hasattr(embed, "thumbnail"):
         new_embed.set_thumbnail(url=embed.thumbnail.url)
