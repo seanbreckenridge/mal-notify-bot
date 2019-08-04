@@ -38,11 +38,16 @@ def setup_logger(name, logfile_name, supress_stream_output=False):
 
 
 def extract_mal_id_from_url(url) -> str:
-    result = re.findall("https:\/\/myanimelist\.net\/anime\/(\d+)", "https://myanimelist.net/anime/1")
+    """
+    >>> extract_mal_id_from_url("https://myanimelist.net/anime/5")
+    '5'
+    """
+    result = re.findall("https:\/\/myanimelist\.net\/anime\/(\d+)", url)
     if not result: # no regex matches
         return None
     else:
         return result[0]
+
 
 def remove_discord_link_supression(link):
     link = link.strip()

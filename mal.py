@@ -16,22 +16,8 @@ from utils import setup_logger
 from utils.embeds import create_embed
 
 
-root_dir = os.path.abspath(os.path.dirname(__file__))
-mal_id_cache_dir = os.path.join(root_dir, "mal-id-cache")
 
 logger = setup_logger(__name__, "mal", supress_stream_output=True)
-
-def update_git_repo():
-    """Updates from the remote mal-id-cache"""
-    g = git.cmd.Git(mal_id_cache_dir)
-    g.pull()
-
-
-def read_json_cache():
-    with open(os.path.join(mal_id_cache_dir, "cache.json"), 'r') as cache_f:
-        contents = json.load(cache_f)
-    contents = contents["sfw"] + contents["nsfw"]
-    return contents
 
 def loop():
 

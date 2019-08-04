@@ -18,13 +18,16 @@ from asyncio import sleep
 
 from utils import *
 from utils.embeds import refresh_embed, add_source, remove_source
-from utils.user import download_users_list
+from utils.user import download_users_list  # currently not used
 
 # setup project and discord.py logs
 logger = setup_logger(__name__, "bot", supress_stream_output=True)
 logging.basicConfig()
 discord_logs = logging.getLogger("discord")
 discord_logs.setLevel(logging.INFO)
+root_dir = os.path.abspath(os.path.dirname(__file__))
+mal_id_cache_dir = os.path.join(root_dir, "mal-id-cache")
+
 
 def log(func):
     """Decorator for functions, to log start/end times"""
@@ -41,6 +44,7 @@ def log(func):
     return wrapper
 
 
+
 class FileState():
     """Parent class for managing file states"""
     def __init__(self, filepath):
@@ -48,47 +52,6 @@ class FileState():
 
     def file_exists(self):
         return os.path.exists(self.filepath)
-
-class IdProcessManager(FileState):
-    """Manage tracking the current mal.py process"""
-
-    def __init__(self, *, filepath="pid", manager_python_file=None):
-        """
-        filepath: file that contains the current pid
-        manager_python_file: file that manages pulling new IDs from github and creating pickle embeds
-        """
-        super().__init__(filepath)
-        self.process_filepath = manager_python_file
-        self.pid = None
-
-    @log
-    def poll(self):
-        """If the process doesn't exist start it"""
-        if not self.file_exists():
-            return self._call_process()
-        else:
-            self.read_from_pid_file()
-            if not self.check_pid():
-                return self._call_process()
-
-    @log
-    def read():
-        with open(self.filepath, 'r') as pid_f:
-            self.pid = int(pid_f.read())
-
-    @log
-    def _call_process():
-        """Call the process that checks for new IDs/generates embeds as a background process"""
-        os.system("python3 {} &".format(self.process_filepath))
-
-    @log
-    def check_pid():
-        try:
-            os.kill(self.pid, 0)
-        except OSError:
-            return False
-        else:
-            return True
 
 
 class OldDatabase(FileState):
@@ -109,20 +72,21 @@ class OldDatabase(FileState):
             old_f.write("\n".join(contents))
 
 
-class NewEntries(FileState):
-    """Models and interacts with the 'new' pickles file"""
+@log
+def update_git_repo():
+    """Updates from the remote mal-id-cache"""
+    g = git.cmd.Git(mal_id_cache_dir)
+    g.pull()
 
-    def __init__(self, *, filepath="new"):
-        super().__init__(filepath)
 
-    @log
-    def read():
-        with open(self.filepath, 'rb') as new_f:
-            return pickle.load(new_f)
+@log
+def read_json_cache():
+    """Reads the cache from mal-id-cache/cache.json and combines sfw ids with nsfw"""
+    with open(os.path.join(mal_id_cache_dir, "cache.json"), 'r') as cache_f:
+        contents = json.load(cache_f)
+    contents = contents["sfw"] + contents["nsfw"]
+    return contents
 
-    def remove():
-        if self.file_exists():
-            os.remove(self.filepath)
 
 def is_admin_or_owner():
     """Check that returns True if the user is the owner/admin on the server"""
@@ -138,7 +102,7 @@ def has_privilege():
         is_owner = await ctx.bot.is_owner(ctx.author)
         is_admin = ctx.author.permissions_in(ctx.channel).administrator
         is_trusted = "trusted" in [role.name.lower() for role in ctx.author.roles]
-        return is_owner or is_admin or is_trusted
+        return is_owner or is_admin or is_trustedo
     return commands.check(predicate)
 
 
@@ -163,8 +127,6 @@ async def on_ready():
     if client.nsfw_feed_channel is None:
         logger.critical("Couldn't find the 'nsfw-feed' channel")
     client.old_db = OldDatabase(filepath="old")
-    client.new_entries = NewEntries(filepath="new")
-    client.process_manager = IdProcessManager(filepath="pid", manager_python_file="mal.py")
 
 
 # override on_message so we can remove double spaces after the bot name,
@@ -173,6 +135,7 @@ async def on_ready():
 async def on_message(message):
     message.content = re.sub("\s{2,}", " ", message.content) # remove weird spaces
     await client.process_commands(message)
+
 
 @log
 async def search_feed_for_mal_id(mal_id, channel, limit) -> Message:
@@ -192,49 +155,72 @@ async def search_feed_for_mal_id(mal_id, channel, limit) -> Message:
             continue
     return None  # if we've exited the loop
 
+
 # run in event loop
 @log
 async def print_loop():
-    await client.wait_until_ready()
+    await client.wait_until_ready():
     while not client.is_closed():
-        # check if scraper is running
-        client.process_manager.poll()
-        # if there are new entries print them
-        if client.new_entries.file_exists():
-            await client.add_new_entries()
-        # check for 'new' file periodically
+        # if there are new entries, print them
+        await print_new_embeds(new_embeds)
         await sleep(client.period)
-
-@log
-async def add_new_entries():
-    pickles = client.new_entries.read()
-    old_entries = client.old_db.read()
-    for new, sfw in pickles:
-        if new not in old_entries: # makes sure we're not printing entries twice
-            if sfw:
-                await feed_channel.send(embed=new)
-            else:
-                await nsfw_feed_channel.send(embed=new)
-            # make sure that we actually printed it and it didn't fail due to network issues
-            new_mal_id = extract_mal_id_from_url(new.url)
-            check_channel = feed_channel if sfw else nsfw_feed_channel
-            result = await search_feed_for_mal_id(mal_id=new_mal_id, channel=check_channel, limit=50)
-            if result: # if we found the corresponding embed
-                old_entries.add(new_mal_id)
-    client.old_db.dump(old_entries)
-    # if id's weren't found in the 'search_feed_for_mal_id', the id will remain not in old_entries
-    # and a new embed will be generated next time the loop in mal.py runs
-    client.new_entries.remove() # remove new entries file as we've logged them
 
 
 @client.command()
 @has_privilege()
 @log
 async def add_new(ctx):
-    if client.new_entries.file_exists():
-        await client.add_new_entries()
+    new_embeds = create_new_embeds()
+    old_ids = client.old_db.read()
+    if not new_embeds:
+        return await ctx.channel.send("No new entries found.")
     else:
-        await ctx.channel.send("No new entries found.")
+        return await print_new_embeds(new_embeds=new_embeds)
+
+@backoff.
+@log
+async def create_new_embeds():
+    """
+    git pulls, reads the json cache, and returns new embeds if they exist
+    this *is* blocking, but temporarily blocking seems better than managing multple processes
+    """
+    update_git_repo()
+    ids = read_json_cache()
+    new_ids = []
+    new_embeds = []
+    if not client.old_db.file_exists():
+        logger.info(f"{client.old_db.filepath} didn't exist, creating...")
+        with open(client.old_db.filepath):
+            client.old_db.dump(ids)
+    else:
+        old_ids = client.old_db.read()
+        new_ids = sorted(list(set(ids) - set(old_ids)))
+        logger.debug(f"new ids: {new_ids}")
+
+    for new_id in new_ids:
+        sleep(0) # allow other items in the asyncio loop to run
+        new_embeds.append(create_embed(int(new_id), logger))
+    return new_embeds
+            
+
+@log
+async def print_new_embeds(new_embeds=None):
+    if new_embeds is None:
+        new_embeds = create_new_embeds()
+    if new_embeds:
+        old_ids = client.old_db.read()
+        for embed, sfw in new_embeds:
+            print_to_channel = client.feed_channel if sfw else client.nsfw_feed_channel
+            new_mal_id = extract_mal_id_from_url(embed.url)
+            if new_mal_id not in old_ids: # make sure we're not printing entries twice
+                logger.debug("Printing {} to {}".format(new_mal_id, "#feed" sfw else "#nsfw-feed"))
+                await print_to_channel.send(embed=embed)
+            # check that we actually printed the embed
+            printed_message = await search_feed_for_mal_id(mal_id=new_mal_id, channel=print_to_channel, limit=50)
+            if printed_message:
+                logger.debug("Found printed message in channel, adding {} to old ids".format(new_mal_id))
+                old_ids.add(new_mal_id)
+        client.old_db.dump(old_ids)
 
 
 @client.command()
@@ -266,6 +252,7 @@ async def source(ctx, mal_id: int, *, links):
             # test if link exists; blocking
             try:
                 resp = requests.get(link)
+                sleep(0)
             except requests.exceptions.MissingSchema:
                 return await ctx.channel.send("`{}` has no schema (e.g. https), its not a valid URL.".format(link))
             if not resp.status_code == requests.codes.ok:
