@@ -37,7 +37,7 @@ client = commands.Bot(
     command_prefix=commands.when_mentioned, case_insensitive=False)
 client.remove_command('help')  # remove default help
 # amount of time to wait between checking for new entries
-client.period = 60 * 10
+client.period = 60 * 15
 
 
 def truncate(obj, limit: int):
@@ -193,6 +193,7 @@ async def print_loop():
     while not client.is_closed():
         # if there are new entries, print them
         await print_new_embeds()
+        logger.debug(f"Sleeping for {client.period}")
         await sleep(client.period)
 
 
