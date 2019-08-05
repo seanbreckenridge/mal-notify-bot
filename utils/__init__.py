@@ -4,6 +4,7 @@ import re
 import pickle
 import logging
 
+
 class uuid:
     """Represents function calls as processes so its easier to track where/when they start/end"""
     _id = 0
@@ -18,9 +19,12 @@ class uuid:
         return uuid._id
 
 # provide stream = None to not print to stdout/stderr
+
+
 def setup_logger(name, logfile_name, supress_stream_output=False):
     # setup logs directory
-    logs_dir = os.path.join(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)), "logs")
+    logs_dir = os.path.join(os.path.abspath(os.path.join(
+        os.path.dirname(__file__), os.path.pardir)), "logs")
     if not os.path.exists(logs_dir):
         os.makedirs(logs_dir)
     logger = logging.getLogger(name)
@@ -44,7 +48,7 @@ def extract_mal_id_from_url(url) -> str:
     '5'
     """
     result = re.findall("https:\/\/myanimelist\.net\/anime\/(\d+)", url)
-    if not result: # no regex matches
+    if not result:  # no regex matches
         return None
     else:
         return result[0]

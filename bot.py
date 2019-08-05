@@ -33,10 +33,12 @@ mal_id_cache_dir = os.path.join(root_dir, "mal-id-cache")
 mal_id_cache_json_file = os.path.join(mal_id_cache_dir, "cache.json")
 
 # bot object
-client = commands.Bot(command_prefix=commands.when_mentioned, case_insensitive=False)
-client.remove_command('help') # remove default help
+client = commands.Bot(
+    command_prefix=commands.when_mentioned, case_insensitive=False)
+client.remove_command('help')  # remove default help
 # amount of time to wait between checking for new entries
 client.period = 60 * 10
+
 
 def truncate(obj, limit: int):
     """Truncates the length of args/kwargs for the @log decorator so that we can read logs easier"""
@@ -53,7 +55,8 @@ def log(func):
         _id = uuid.get_and_increment()
         args_text = truncate(args, 2000)
         kwargs_text = truncate(kwargs, 2000)
-        logger.debug(f"{func.__name__} ({_id}) called with {args_text} {kwargs_text}")
+        logger.debug(
+            f"{func.__name__} ({_id}) called with {args_text} {kwargs_text}")
         if inspect.iscoroutinefunction(func):
             result = await func(*args, **kwargs)
         else:
@@ -63,9 +66,9 @@ def log(func):
     return wrapper
 
 
-
 class FileState():
     """Parent class for managing file states"""
+
     def __init__(self, filepath):
         self.filepath = filepath
 
@@ -122,12 +125,14 @@ def is_admin_or_owner():
         return is_owner or is_admin
     return commands.check(predicate)
 
+
 def has_privilege():
     """Check that returns true if the user can use 'trusted' commands or is owner/admin"""
     async def predicate(ctx):
         is_owner = await ctx.bot.is_owner(ctx.author)
         is_admin = ctx.author.permissions_in(ctx.channel).administrator
-        is_trusted = "trusted" in [role.name.lower() for role in ctx.author.roles]
+        is_trusted = "trusted" in [role.name.lower()
+                                   for role in ctx.author.roles]
         return is_owner or is_admin or is_trustedo
     return commands.check(predicate)
 
@@ -156,7 +161,8 @@ async def on_ready():
 # which would ordinarily not trigger commands
 @client.event
 async def on_message(message):
-    message.content = re.sub("\s{2,}", " ", message.content) # remove weird spaces
+    message.content = re.sub(
+        "\s{2,}", " ", message.content)  # remove weird spaces
     await client.process_commands(message)
 
 
@@ -233,10 +239,10 @@ async def create_new_embeds(ctx=None):
         return []
 
     for new_id in new_ids:
-        sleep(0) # allow other items in the asyncio loop to run
+        sleep(0)  # allow other items in the asyncio loop to run
         new_embeds.append(create_embed(int(new_id), logger))
     return new_embeds
-            
+
 
 @log
 async def print_new_embeds(new_embeds=None):
@@ -247,16 +253,19 @@ async def print_new_embeds(new_embeds=None):
         for embed, sfw in new_embeds:
             print_to_channel = client.feed_channel if sfw else client.nsfw_feed_channel
             new_mal_id = extract_mal_id_from_url(embed.url)
-            if new_mal_id not in old_ids: # make sure we're not printing entries twice
-                logger.debug("Printing {} to {}".format(new_mal_id, "#feed" if sfw else "#nsfw-feed"))
+            if new_mal_id not in old_ids:  # make sure we're not printing entries twice
+                logger.debug("Printing {} to {}".format(
+                    new_mal_id, "#feed" if sfw else "#nsfw-feed"))
                 await print_to_channel.send(embed=embed)
             # check that we actually printed the embed
             printed_message = await search_feed_for_mal_id(mal_id=new_mal_id, channel=print_to_channel, limit=50)
             if printed_message:
-                logger.debug("Found printed message in channel, adding {} to old ids".format(new_mal_id))
+                logger.debug(
+                    "Found printed message in channel, adding {} to old ids".format(new_mal_id))
                 old_ids.add(new_mal_id)
             else:
-                logger.warning("Couldnt find printed message for id {} in channel".format(new_mal_id))
+                logger.warning(
+                    "Couldnt find printed message for id {} in channel".format(new_mal_id))
         await client.old_db.dump(old_ids)
 
 
@@ -278,8 +287,9 @@ async def source(ctx, mal_id: int, *, links):
         adding_source = True
         if links.strip().lower() == "remove":
             adding_source = False
-        logger.debug("{} source".format("Adding" if adding_source else "Removing"))
-        
+        logger.debug("{} source".format(
+            "Adding" if adding_source else "Removing"))
+
         if adding_source:
             valid_links = []
             # if there are multiple links, check each
@@ -342,7 +352,7 @@ async def check(self, ctx, mal_username, num: int):
         for e in entries:
             parsed[e['mal_id']] = e['watching_status']
         await message.edit(content=f"Downloading {mal_username}'s list (downloaded {len(parsed)} anime entries...)")
-    found_entry = False # mark True if we find an entry the user hasnt watched
+    found_entry = False  # mark True if we find an entry the user hasnt watched
     async for message in client.feed_channel.history(limit=num, oldest_first=False):
         try:
             embed = message.embeds[0]
@@ -350,14 +360,16 @@ async def check(self, ctx, mal_username, num: int):
             continue
         source_exists = "Source" in [f.name for f in embed.fields]
         if source_exists or print_all:
-            m = re.search("https:\/\/myanimelist\.net\/anime\/(\d+)", embed.url)
+            m = re.search(
+                "https:\/\/myanimelist\.net\/anime\/(\d+)", embed.url)
             mal_id = int(m.group(1))
             on_your_list = mal_id in parsed
             on_your_ptw = mal_id in parsed and parsed[mal_id] == "6"
             if (not on_your_list) or (on_your_ptw and source_exists):
                 found_entry = True
                 if source_exists:
-                    fixed_urls = " ".join(["<{}>".format(url) for url in [f.value for f in embed.fields if f.name == "Source"][0].split()])
+                    fixed_urls = " ".join(["<{}>".format(url) for url in [
+                                          f.value for f in embed.fields if f.name == "Source"][0].split()])
                     if on_your_ptw:
                         await ctx.channel.send("{} is on your PTW, but it has a source: {}".format(embed.url, fixed_urls))
                     else:
@@ -372,7 +384,7 @@ async def check(self, ctx, mal_username, num: int):
 @client.command()
 @log
 async def help(ctx):
-   return await ctx.channel.send("I'm helping!")
+    return await ctx.channel.send("I'm helping!")
 
 
 @client.event
@@ -381,7 +393,8 @@ async def on_command_error(ctx, error):
     command_name = None
     if ctx.command:
         command_name = ctx.command.name
-    clean_message_content = ctx.message.content.split(">", maxsplit=1)[1].strip().replace("`", '')
+    clean_message_content = ctx.message.content.split(
+        ">", maxsplit=1)[1].strip().replace("`", '')
     args = clean_message_content.split()
 
     # prevent self-loops; on_command_error calling on_command_error
@@ -414,13 +427,15 @@ async def on_command_error(ctx, error):
         if isinstance(original_error, errors.HTTPException):
             await ctx.channel.send("There was an issue connecting to the Discord API. Wait a few moments and try again.")
         elif isinstance(original_error, RuntimeError):
-            await ctx.channel.send(str(original_error)) # couldn't find a user with that username
+            # couldn't find a user with that username
+            await ctx.channel.send(str(original_error))
         elif isinstance(original_error, requests.exceptions.InvalidURL):
             await ctx.channel.send(f"Error with that URL: {str(original_error)}")
         else:
             await ctx.channel.send("Uncaught error: {} - {}".format(type(error.original).__name__, error.original))
             logger.exception(error.original)
-            logger.exception("".join(traceback.format_tb(error.original.__traceback__)))
+            logger.exception(
+                "".join(traceback.format_tb(error.original.__traceback__)))
     else:
         await ctx.channel.send("Uncaught error: {} - {}".format(type(error).__name__, error))
         logger.exception(error, exc_info=True)
