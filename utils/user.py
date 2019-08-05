@@ -3,13 +3,15 @@ import requests
 import backoff
 
 j = jikanpy.Jikan("http://localhost:8000/v3/")
+
+
 @backoff.on_exception(
     backoff.fibo,  # fibonacci sequence backoff
     (jikanpy.exceptions.JikanException,
      jikanpy.exceptions.APIException),
     max_tries=10,
     on_backoff=lambda x: print("backing off")
-    )
+)
 def get_page(username, page):
     return j.user(username, 'animelist', argument='all', page=page)
 
@@ -25,6 +27,7 @@ def download_users_list(username):
         entry_count = len(resp["anime"])
         yield resp["anime"]
         page_number += 1
+
 
 if __name__ == "__main__":
     import sys

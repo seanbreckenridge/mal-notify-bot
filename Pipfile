@@ -4,6 +4,7 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
+autopep8 = "*"
 
 [packages]
 pyyaml = "*"
@@ -12,6 +13,7 @@ discord-py = ">=1.2.3"
 gitpython = "*"
 jikanpy = {editable = true,git = "https://github.com/AWConant/jikanpy",ref = "master"}
 backoff = "*"
+aiofiles = "*"
 
 [requires]
 python_version = "3.6"
