@@ -385,7 +385,16 @@ async def check(self, ctx, mal_username, num: int):
 @client.command()
 @log
 async def help(ctx):
-    return await ctx.channel.send("I'm helping!")
+    mentionbot = f"@{ctx.guild.me.display_name}"
+    embed=Embed(title="mal-notify help", color=0x4eb1ff)
+    embed.add_field(name="basic commands", value='\u200b', inline=False)
+    embed.add_field(name=f"{mentionbot} help", value="Show this message and quit", inline=False)
+    embed.add_field(name=f"{mentionbot} check <mal_username> <n> [all]", value=f"Check the last 'n' entries for any items not on your list. Can add 'all' after the number of entries to check to list all items. By default only lists items which have sources. e.g. `{mentionbot} check Xinil 10 all`. This command is currently disabled.", inline=False)
+    embed.add_field(name="'trusted' commands", value='\u200b', inline=False)
+    embed.add_field(name=f"{mentionbot} add_new", value="Checks if any new items have been added in the last 15 minutes. Runs automatically at 15 minute intervals.", inline=False)
+    embed.add_field(name=f"{mentionbot} source <mal_id> <links...|remove>", value="Adds a source to an embed in #feed. Requires either the link or the `remove` keyword. e.g. `{mentionbot} source 1 https://....` or `{mentionbot} source 14939 remove`", inline=False)
+    embed.add_field(name=f"{mentionbot} refresh", value=f"Refreshes an embed - checks if the metadata (i.e. description, air date, image) has changed and updates accordingly. e.g. `{mentionbot} refresh 40020`", inline=False)
+    await ctx.channel.send(embed=embed)
 
 
 @client.event
