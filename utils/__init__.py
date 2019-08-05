@@ -26,7 +26,8 @@ def setup_logger(name, logfile_name, supress_stream_output=False):
     logger = logging.getLogger(name)
     LOGLEVEL = os.environ.get("LOGLEVEL", "DEBUG")
     logger.setLevel(LOGLEVEL)
-    formatter = logging.Formatter("%(asctime)s %(levelno)s %(process)d %(message)s")
+    formatter = logging.Formatter(
+        '%(asctime)s %(levelname)s %(name)s/%(filename)s %(funcName)s - %(message)s')
     fh = logging.FileHandler(os.path.join(logs_dir, logfile_name + ".log"))
     fh.setFormatter(formatter)
     logger.addHandler(fh)

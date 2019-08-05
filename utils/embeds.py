@@ -17,9 +17,6 @@ def get_data(mal_id:int, ignore_image: bool, **kwargs):
     name = image = synopsis = sfw = airdate = status = None
     logger = kwargs.get('logger', None)
     resp = j.anime(mal_id)
-    if logger is not None:
-        logger.debug("Generating embed for MAL id: {}".format(mal_id))
-
     name = resp['title']
     if not ignore_image:
         image = resp['image_url']
@@ -89,7 +86,6 @@ def refresh_embed(embed, mal_id:int, remove_image: bool, logger):
     return new_embed
 
 def add_source(embed, valid_links):
-    print("Hi!")
     new_embed=discord.Embed(title=embed.title, url=embed.url, color=discord.Color.dark_blue())
     if hasattr(embed, "thumbnail"):
         new_embed.set_thumbnail(url=embed.thumbnail.url)
