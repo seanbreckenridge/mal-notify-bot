@@ -133,7 +133,7 @@ def has_privilege():
         is_admin = ctx.author.permissions_in(ctx.channel).administrator
         is_trusted = "trusted" in [role.name.lower()
                                    for role in ctx.author.roles]
-        return is_owner or is_admin or is_trustedo
+        return is_owner or is_admin or is_trusted
     return commands.check(predicate)
 
 
