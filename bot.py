@@ -332,7 +332,7 @@ async def refresh(ctx, mal_id: int):
         remove_image = "remove image" in ctx.message.content.lower()
         message = await search_feed_for_mal_id(str(mal_id), client.feed_channel, limit=999999)
         if not message:
-            return await ctx.channel.send("Could not find a message that conatins the MAL id {} in {}".format(mal_id, client.feed_channel.mention))
+            return await ctx.channel.send("Could not find a message that contains the MAL id {} in {}".format(mal_id, client.feed_channel.mention))
         else:
             embed = message.embeds[0]
             new_embed = refresh_embed(embed, mal_id, remove_image, logger)
@@ -430,7 +430,7 @@ async def on_command_error(ctx, error):
     elif isinstance(error, commands.BadArgument) and command_name == "check":
         try:
             int(args[2])
-        except:
+        except ValueError:
             await ctx.channel.send("Error converting `{}` to an integer.".format(args[2]))
     elif isinstance(error, commands.CommandInvokeError):
         original_error = error.original
