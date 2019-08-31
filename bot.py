@@ -31,6 +31,7 @@ discord_logs.setLevel(logging.INFO)
 root_dir = os.path.abspath(os.path.dirname(__file__))
 mal_id_cache_dir = os.path.join(root_dir, "mal-id-cache")
 mal_id_cache_json_file = os.path.join(mal_id_cache_dir, "cache.json")
+token_file = os.path.join(root_dir, "token.yaml")
 
 # bot object
 client = commands.Bot(
@@ -82,7 +83,7 @@ class FileState():
 class OldDatabase(FileState):
     """Models and interacts with the 'old' database file"""
 
-    def __init__(self, *, filepath="old"):
+    def __init__(self, *, filepath):
         super().__init__(filepath)
 
     @log
@@ -153,7 +154,7 @@ async def on_ready():
         logger.critical("Couldn't find the 'feed' channel")
     if client.nsfw_feed_channel is None:
         logger.critical("Couldn't find the 'nsfw-feed' channel")
-    client.old_db = OldDatabase(filepath="old")
+    client.old_db = OldDatabase(filepath=os.path.join(root_dir, "old"))
     client.loop.create_task(print_loop())
 
 
@@ -451,8 +452,9 @@ async def on_command_error(ctx, error):
         logger.exception(error, exc_info=True)
 
 
-# Token is stored in token.yaml, with the key 'token'
-with open('token.yaml', 'r') as t:
-    token = yaml.load(t, Loader=yaml.FullLoader)["token"]
+if __name__ == "__main__":
+    # Token is stored in token.yaml, with the key 'token'
+    with open(token_file, 'r') as t:
+        token = yaml.load(t, Loader=yaml.FullLoader)["token"]
 
-client.run(token, bot=True, reconnect=True)
+    client.run(token, bot=True, reconnect=True)
