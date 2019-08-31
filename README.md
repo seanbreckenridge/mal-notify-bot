@@ -30,6 +30,6 @@ This uses a local [jikan-rest](https://github.com/jikan-me/jikan-rest) instance 
 
 #### Run:
 
-`python3 bot.py`. Theres also a [wrapper script](./run) that restarts incase of network failure/exceptions, but the [`reconnect` flag on client.run](https://github.com/seanbreckenridge/mal-notify-bot/blob/22de12168c7970bb0dc6ca2aaf17db4a80cb6b3c/bot.py#L449) should handle that.
+`python3 bot.py`
 
 This is run on `python 3.6`. You can use [pyenv](https://github.com/pyenv/pyenv) to install another version of python if needed.
