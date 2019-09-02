@@ -208,7 +208,7 @@ async def add_new(ctx):
             return await ctx.channel.send("No new entries found.")
         else:
             entry_count = len(new_embeds)
-            await ctx.channel.send("Found {} new entr{}.".format(entry_count, "y" if entry_count == 1 else ies))
+            await ctx.channel.send("Found {} new entr{}.".format(entry_count, "y" if entry_count == 1 else "ies"))
             return await print_new_embeds(new_embeds=new_embeds)
 
 
