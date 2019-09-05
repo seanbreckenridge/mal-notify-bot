@@ -299,14 +299,14 @@ async def source(ctx, mal_id: int, *, links):
                 # remove supression from link, if it exists
                 link = remove_discord_link_supression(link)
 
-                # test if link exists; blocking
+                """# test if link exists; blocking
                 try:
                     resp = requests.get(link)
                     sleep(0)
                 except requests.exceptions.MissingSchema:
                     return await ctx.channel.send("`{}` has no schema (e.g. https), its not a valid URL.".format(link))
                 if not resp.status_code == requests.codes.ok:
-                    return await ctx.channel.send("Error connecting to <{}> with status code {}".format(link, resp.status_code))
+                    return await ctx.channel.send("Error connecting to <{}> with status code {}".format(link, resp.status_code))"""
                 valid_links.append(link)
 
         # get logs from feed
@@ -343,17 +343,19 @@ async def refresh(ctx, mal_id: int):
 
 @client.command()
 @log
-async def check(self, ctx, mal_username, num: int):
+async def check(ctx, mal_username: str, num: int):
     # the request.get calls are synchronous - blocking, figure out a better way to implement this
-    return await ctx.channel.send("This command is currently disabled.")
+    #return await ctx.channel.send("This command is currently disabled.")
     leftover_args = " ".join(ctx.message.content.strip().split()[4:])
     print_all = "all" in leftover_args.lower()
+    print_not_completed = "not completed" in leftover_args.lower()
     message = await ctx.channel.send("Downloading {}'s list (downloaded 0 anime entries...)".format(mal_username))
     parsed = {}
     for entries in download_users_list(mal_username):
         for e in entries:
             parsed[e['mal_id']] = e['watching_status']
         await message.edit(content=f"Downloading {mal_username}'s list (downloaded {len(parsed)} anime entries...)")
+        await sleep(0.5) # be nice to other tasks
     found_entry = False  # mark True if we find an entry the user hasnt watched
     async for message in client.feed_channel.history(limit=num, oldest_first=False):
         try:
@@ -366,14 +368,17 @@ async def check(self, ctx, mal_username, num: int):
                 "https:\/\/myanimelist\.net\/anime\/(\d+)", embed.url)
             mal_id = int(m.group(1))
             on_your_list = mal_id in parsed
-            on_your_ptw = mal_id in parsed and parsed[mal_id] == "6"
-            if (not on_your_list) or (on_your_ptw and source_exists):
+            on_your_ptw = mal_id in parsed and parsed[mal_id] == 6
+            on_your_completed = mal_id in parsed and parsed[mal_id] == 2
+            if (not on_your_list) or (on_your_ptw or (print_not_completed and not on_your_completed)):
                 found_entry = True
                 if source_exists:
                     fixed_urls = " ".join(["<{}>".format(url) for url in [
                                           f.value for f in embed.fields if f.name == "Source"][0].split()])
                     if on_your_ptw:
                         await ctx.channel.send("{} is on your PTW, but it has a source: {}".format(embed.url, fixed_urls))
+                    elif print_not_completed:
+                        await ctx.channel.send("{} is not on your Completed, but it has a source: {}".format(embed.url, fixed_urls))
                     else:
                         await ctx.channel.send("{} isn't on your list, but it has a source: {}".format(embed.url, fixed_urls))
                 else:
@@ -390,7 +395,7 @@ async def help(ctx):
     embed=Embed(title="mal-notify help", color=0x4eb1ff)
     embed.add_field(name="basic commands", value='\u200b', inline=False)
     embed.add_field(name=f"{mentionbot} help", value="Show this message", inline=False)
-    embed.add_field(name=f"{mentionbot} check <mal_username> <n> [all]", value=f"Check the last 'n' in #feed entries for any items not on your MAL. Can add 'all' after the number of entries to check to list all items. By default only lists items which have sources. e.g. `{mentionbot} check Xinil 10 all`. This command is currently disabled.", inline=False)
+    embed.add_field(name=f"{mentionbot} check <mal_username> <n> [all]", value=f"Check the last 'n' in #feed entries for any items not on your MAL. Can add 'all' after the number of entries to check to list all items. By default only lists items which have sources. e.g. `{mentionbot} check Xinil 10 all`. `{mentionbot} check <mal_username> <n> not completed` will print any items that have a source in the last 10 entries but you don't have completed", inline=False)
     embed.add_field(name="'trusted' commands", value='\u200b', inline=False)
     embed.add_field(name=f"{mentionbot} add_new", value="Checks if any new items have been added in the last 15 minutes. Runs automatically at 15 minute intervals.", inline=False)
     embed.add_field(name=f"{mentionbot} source <mal_id> <links...|remove>", value=f"Adds a source to an embed in #feed. Requires either the link or the `remove` keyword. e.g. `{mentionbot} source 1 https://....` or `{mentionbot} source 14939 remove`", inline=False)
