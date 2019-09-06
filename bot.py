@@ -395,7 +395,7 @@ async def help(ctx):
     embed=Embed(title="mal-notify help", color=0x4eb1ff)
     embed.add_field(name="basic commands", value='\u200b', inline=False)
     embed.add_field(name=f"{mentionbot} help", value="Show this message", inline=False)
-    embed.add_field(name=f"{mentionbot} check <mal_username> <n> [all]", value=f"Check the last 'n' in #feed entries for any items not on your MAL. Can add 'all' after the number of entries to check to list all items. By default only lists items which have sources. e.g. `{mentionbot} check Xinil 10 all`. `{mentionbot} check <mal_username> <n> not completed` will print any items that have a source in the last 10 entries but you don't have completed", inline=False)
+    embed.add_field(name=f"{mentionbot} check <mal_username> <n> [all]", value=f"Check the last 'n' in #feed entries for any items not on your MAL. Can add 'all' after the number of entries to check to list all items. By default only lists items which have sources. e.g. `{mentionbot} check Xinil 10 all`. `{mentionbot} check <mal_username> <n> not completed` will print any items that are not completed on your list which have a source in the last 'n' entries in #feed.", inline=False)
     embed.add_field(name="'trusted' commands", value='\u200b', inline=False)
     embed.add_field(name=f"{mentionbot} add_new", value="Checks if any new items have been added in the last 15 minutes. Runs automatically at 15 minute intervals.", inline=False)
     embed.add_field(name=f"{mentionbot} source <mal_id> <links...|remove>", value=f"Adds a source to an embed in #feed. Requires either the link or the `remove` keyword. e.g. `{mentionbot} source 1 https://....` or `{mentionbot} source 14939 remove`", inline=False)
@@ -461,5 +461,4 @@ if __name__ == "__main__":
     # Token is stored in token.yaml, with the key 'token'
     with open(token_file, 'r') as t:
         token = yaml.load(t, Loader=yaml.FullLoader)["token"]
-
     client.run(token, bot=True, reconnect=True)
