@@ -30,7 +30,7 @@ discord_logs = logging.getLogger("discord")
 discord_logs.setLevel(logging.INFO)
 root_dir = os.path.abspath(os.path.dirname(__file__))
 mal_id_cache_dir = os.path.join(root_dir, "mal-id-cache")
-mal_id_cache_json_file = os.path.join(mal_id_cache_dir, "cache.json")
+mal_id_cache_json_file = os.path.join(mal_id_cache_dir, "cache", "anime_cache.json")
 token_file = os.path.join(root_dir, "token.yaml")
 
 # bot object
