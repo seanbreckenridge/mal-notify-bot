@@ -29,8 +29,8 @@ def get_data(mal_id: int, ignore_image: bool, **kwargs):
         synopsis = re.sub("\n\s*\n", "\n", synopsis.strip()).strip()
         if len(synopsis) > 400:
             synopsis = synopsis[:400].strip() + "..."
-    if synopsis.strip() == "":
-        synopsis = "No Synopsis"
+        if synopsis.strip() == "":
+            synopsis = "No Synopsis"
     status = resp["status"]
     airdate = resp["aired"].get("string", None)
     sfw = 12 not in [g['mal_id'] for g in resp['genres']]
