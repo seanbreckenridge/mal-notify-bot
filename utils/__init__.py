@@ -24,18 +24,11 @@ class uuid:
 
 def setup_logger(name, logfile_name, supress_stream_output=False):
     # setup logs directory
-    logs_dir = os.path.join(os.path.abspath(os.path.join(
-        os.path.dirname(__file__), os.path.pardir)), "logs")
-    if not os.path.exists(logs_dir):
-        os.makedirs(logs_dir)
     logger = logging.getLogger(name)
     LOGLEVEL = os.environ.get("LOGLEVEL", "DEBUG")
     logger.setLevel(LOGLEVEL)
     formatter = logging.Formatter(
         '%(asctime)s %(levelname)s %(name)s/%(filename)s - %(message)s')
-    fh = logging.FileHandler(os.path.join(logs_dir, logfile_name + ".log"))
-    fh.setFormatter(formatter)
-    logger.addHandler(fh)
     if not supress_stream_output:
         sh = logging.StreamHandler()
         sh.setFormatter(formatter)
