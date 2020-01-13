@@ -9,9 +9,9 @@ autopep8 = "*"
 [packages]
 pyyaml = "*"
 requests = "*"
-discord-py = ">=1.2.3"
+discord-py = ">=1.2.5"
 gitpython = "*"
-jikanpy = {editable = true,git = "https://github.com/AWConant/jikanpy",ref = "master"}
+jikanpy = "*"
 backoff = "*"
 aiofiles = "*"
 
