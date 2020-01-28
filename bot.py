@@ -332,13 +332,15 @@ async def refresh(ctx, mal_id: int):
     with ctx.channel.typing():
         remove_image = "remove image" in ctx.message.content.lower()
         message = await search_feed_for_mal_id(str(mal_id), client.feed_channel, limit=999999)
-        if not message:
-            return await ctx.channel.send("Could not find a message that contains the MAL id {} in {}".format(mal_id, client.feed_channel.mention))
-        else:
+        if not message:  # search nsfw channel
+            message = await search_feed_for_mal_id(str(mal_id), client.nsfw_feed_channel, limit=999999) 
+        if message:
             embed = message.embeds[0]
             new_embed = refresh_embed(embed, mal_id, remove_image, logger)
             await message.edit(embed=new_embed)
             return await ctx.channel.send("{} for '{}' successfully.".format("Removed image" if remove_image else "Updated fields", embed.title))
+        else:
+            return await ctx.channel.send("Could not find a message that contains the MAL id {}".format(mal_id))
 
 
 @client.command()
