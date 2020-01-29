@@ -24,8 +24,7 @@ from utils.embeds import create_embed, refresh_embed, add_source, remove_source
 from utils.user import download_users_list  # currently not used
 
 # setup project and discord.py logs
-logger = setup_logger(__name__, "bot", supress_stream_output=True)
-logging.basicConfig()
+logger = setup_logger(__name__, "bot", supress_stream_output=False)
 discord_logs = logging.getLogger("discord")
 discord_logs.setLevel(logging.INFO)
 root_dir = os.path.abspath(os.path.dirname(__file__))
