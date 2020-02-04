@@ -1,3 +1,5 @@
+import time
+
 import jikanpy
 import requests
 import backoff
@@ -13,6 +15,7 @@ j = jikanpy.Jikan("http://localhost:8000/v3/")
     on_backoff=lambda x: print("backing off")
 )
 def get_page(username, page):
+    time.sleep(3)
     return j.user(username, 'animelist', argument='all', page=page)
 
 
