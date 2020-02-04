@@ -1,8 +1,6 @@
 import os
 import sys
 import re
-import time
-import pdb
 import json
 import logging
 import inspect
@@ -139,22 +137,8 @@ def has_privilege():
 
 @client.event
 @log
-async def on_ready():
-    # setup global variables
-    guilds = list(iter(client.guilds))
-    if len(guilds) != 1:
-        logger.critical("This bot should only be used on one server")
-        await client.logout()
-        sys.exit(1)
-    channels = guilds[0].channels
-    client.feed_channel = get(channels, name="feed")
-    client.nsfw_feed_channel = get(channels, name="nsfw-feed")
-    if client.feed_channel is None:
-        logger.critical("Couldn't find the 'feed' channel")
-    if client.nsfw_feed_channel is None:
-        logger.critical("Couldn't find the 'nsfw-feed' channel")
-    client.old_db = OldDatabase(filepath=os.path.join(root_dir, "old"))
-    client.loop.create_task(print_loop())
+async def on_ready():  # include so that on_ready event shows up in logs
+    pass
 
 
 # override on_message so we can remove double spaces after the bot name,
@@ -190,6 +174,20 @@ async def search_feed_for_mal_id(mal_id, channel, limit) -> Message:
 async def print_loop():
     """main loop - checks if entries exist periodically and prints them"""
     await client.wait_until_ready()
+    # setup global variables
+    guilds = list(iter(client.guilds))
+    if len(guilds) != 1:
+        logger.critical("This bot should only be used on one server")
+        await client.logout()
+        sys.exit(1)
+    channels = guilds[0].channels
+    client.feed_channel = get(channels, name="feed")
+    client.nsfw_feed_channel = get(channels, name="nsfw-feed")
+    if client.feed_channel is None:
+        logger.critical("Couldn't find the 'feed' channel")
+    if client.nsfw_feed_channel is None:
+        logger.critical("Couldn't find the 'nsfw-feed' channel")
+    client.old_db = OldDatabase(filepath=os.path.join(root_dir, "old"))
     while not client.is_closed():
         # if there are new entries, print them
         await print_new_embeds()
@@ -462,4 +460,5 @@ if __name__ == "__main__":
     # Token is stored in token.yaml, with the key 'token'
     with open(token_file, 'r') as t:
         token = yaml.load(t, Loader=yaml.FullLoader)["token"]
+    client.loop.create_task(print_loop())  # waits until bot is ready
     client.run(token, bot=True, reconnect=True)
