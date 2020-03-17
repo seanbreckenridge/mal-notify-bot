@@ -22,6 +22,8 @@ git clone https://github.com/seanbreckenridge/mal-id-cache
 touch token.yaml
 ```
 
+This uses a file in this directory called `old` which caches the already printed entries; if one was to start this on a new server, it would send every entry since it hasn't sent any yet. You can use my [`mal-id-cache`](https://github.com/seanbreckenridge/mal-id-cache) repository as a base, by reading in the SFW/NSFW IDs for anime, and saving those to a file named `old`. The format is just a text file, with one entry per line.
+
 put your bots token in `token.yaml` with contents like:
 
 `token: !!str EU*#3eiSzEr7i4L36FaTlrV0*RtuGOBVNrcteyrtt$GPAwNtkJKQg*dweSLy`
