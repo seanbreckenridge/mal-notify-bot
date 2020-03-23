@@ -10,7 +10,7 @@ You can join the discord server this is run on [here](https://goo.gl/ciydwZ). If
 
 #### Install:
 
-To create your own instance of the bot, create a server which has two channels named `feed` and `nsfw_feed`, [add the bot to it](https://github.com/reactiflux/discord-irc/wiki/Creating-a-discord-bot-&-getting-a-token), and then:
+To create your own instance of the bot, create a server which has two channels named `feed` and `nsfw-feed`, [add the bot to it](https://github.com/reactiflux/discord-irc/wiki/Creating-a-discord-bot-&-getting-a-token), and then:
 
 ```
 git clone https://github.com/seanbreckenridge/mal-notify-bot
