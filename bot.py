@@ -238,7 +238,7 @@ async def create_new_embeds(ctx=None):
         return []
 
     for new_id in new_ids:
-        sleep(0)  # allow other items in the asyncio loop to run
+        await sleep(0)  # allow other items in the asyncio loop to run
         new_embeds.append(create_embed(int(new_id), logger))
     return new_embeds
 
