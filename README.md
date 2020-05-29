@@ -13,7 +13,7 @@ You can join the discord server this is run on [here](https://goo.gl/ciydwZ). If
 To create your own instance of the bot, create a server which has two channels named `feed` and `nsfw-feed`, [add the bot to it](https://github.com/reactiflux/discord-irc/wiki/Creating-a-discord-bot-&-getting-a-token), and then:
 
 ```
-git clone https://github.com/seanbreckenridge/mal-notify-bot
+git clone https://gitlab.com/seanbreckenridge/mal-notify-bot
 cd mal-notify-bot
 python3 -m pip install pipenv  # if you don't have pipenv already
 pipenv install
