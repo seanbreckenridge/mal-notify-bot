@@ -16,7 +16,7 @@ j = jikanpy.Jikan("http://localhost:8000/v3/")
     max_tries=10,
 )
 def get_data(mal_id: int, ignore_image: bool, **kwargs):
-    time.sleep(3)
+    time.sleep(10)
     name = image = synopsis = sfw = airdate = status = None
     logger = kwargs.get('logger', None)
     resp = j.anime(mal_id)
