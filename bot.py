@@ -381,7 +381,8 @@ async def check(ctx, mal_username: str, num: int):
                     else:
                         await ctx.channel.send("{} isn't on your list, but it has a source: {}".format(embed.url, fixed_urls))
                 else:
-                    await ctx.channel.send("{} isn't on your list.".format(embed.url))
+                    if print_all and not on_your_list:
+                        await ctx.channel.send("{} isn't on your list.".format(embed.url))
 
     if not found_entry:
         await ctx.channel.send("I couldn't find any MAL entries in the last {} entries that aren't on your list.".format(num))
