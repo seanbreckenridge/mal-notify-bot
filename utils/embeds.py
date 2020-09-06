@@ -25,7 +25,7 @@ def get_data(mal_id: int, ignore_image: bool, **kwargs):
         image = resp['image_url']
     if image.startswith("https://myanimelist.cdn-dena.com/img/sp/icon/"):
         image = None
-    synopsis = resp.get("synopsis", "No Synopsis")  # return something so that there form POST has value incase synposis is empty
+    synopsis = resp.get("synopsis", "No Synopsis")  # return something so that there form POST has value incase synopsis is empty
     if synopsis is not None:
         synopsis.replace("\r", "")
         synopsis = re.sub("\n\s*\n", "\n", synopsis.strip()).strip()
