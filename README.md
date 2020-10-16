@@ -10,7 +10,9 @@ You can join the discord server this is run on [here](https://goo.gl/ciydwZ). If
 
 #### Install:
 
-To create your own instance of the bot, create a server which has two channels named `feed` and `nsfw-feed`, [add the bot to it](https://github.com/reactiflux/discord-irc/wiki/Creating-a-discord-bot-&-getting-a-token), and then:
+The code is generally up here as reference, I don't see a major reason why one would want to host their own instance of this bot. You can just join the public server above, I maintain the bot there.
+
+Nevertheless, to create your own instance of the bot, create a server which has two channels named `feed` and `nsfw-feed`, [add the bot to it](https://github.com/reactiflux/discord-irc/wiki/Creating-a-discord-bot-&-getting-a-token), and then:
 
 ```
 git clone https://gitlab.com/seanbreckenridge/mal-notify-bot
@@ -22,7 +24,11 @@ git clone https://github.com/seanbreckenridge/mal-id-cache
 touch token.yaml
 ```
 
-This uses a file in this directory called `old` which caches the already printed entries; if one was to start this on a new server, it would send every entry since it hasn't sent any yet. You can use my [`mal-id-cache`](https://github.com/seanbreckenridge/mal-id-cache) repository as a base, by reading in the SFW/NSFW IDs for anime, and saving those to a file named `old`. The format is just a text file, with one entry per line.
+This uses a file in this directory called `old` which caches the already printed entries; if one was to start this on a new server, it would send every entry since it hasn't sent any yet (it doesn't know which ones are 'new'). You can use my [`mal-id-cache`](https://github.com/seanbreckenridge/mal-id-cache) repository as a base, by reading in the SFW/NSFW IDs for anime, and saving those to a file named `old`. The format is just a text file, with one entry per line.
+
+Could create the initial 'old' file by running:
+
+`curl -s 'https://raw.githubusercontent.com/seanbreckenridge/mal-id-cache/master/cache/anime_cache.json' | jq -r '.sfw + .nsfw | .[]' >'old'`
 
 put your bots token in `token.yaml` with contents like:
 
@@ -34,4 +40,4 @@ This uses a local [jikan-rest](https://github.com/jikan-me/jikan-rest) instance 
 
 `python3 bot.py`
 
-This is run on `python 3.7`. You can use [pyenv](https://github.com/pyenv/pyenv) to install an7ther version of python if needed.
+This is run on `python 3.7`. You can use [pyenv](https://github.com/pyenv/pyenv) to install another version of python if needed.
