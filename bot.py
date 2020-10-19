@@ -208,6 +208,12 @@ async def add_new(ctx):
             await ctx.channel.send("Found {} new entr{}.".format(entry_count, "y" if entry_count == 1 else "ies"))
             return await print_new_embeds(new_embeds=new_embeds)
 
+@client.command()
+@has_privilege()
+@log
+async def restart(ctx):
+    await ctx.channel.send("Restarting...")
+    sys.exit(0)
 
 @log
 async def create_new_embeds(ctx=None):
@@ -398,6 +404,7 @@ async def help(ctx):
     embed.add_field(name=f"{mentionbot} check <mal_username> <n> [all]", value=f"Check the last 'n' in #feed entries for any items not on your MAL. Can add 'all' after the number of entries to check to list all items. By default only lists items which have sources. e.g. `{mentionbot} check Xinil 10 all`. `{mentionbot} check <mal_username> <n> not completed` will print any items that are not completed on your list which have a source in the last 'n' entries in #feed.", inline=False)
     embed.add_field(name="'trusted' commands", value='\u200b', inline=False)
     embed.add_field(name=f"{mentionbot} add_new", value="Checks if any new items have been added in the last 10 minutes. Runs automatically at 10 minute intervals.", inline=False)
+    embed.add_field(name=f"{mentionbot} restart", value="Restart the bot", inline=False)
     embed.add_field(name=f"{mentionbot} source <mal_id> <links...|remove>", value=f"Adds a source to an embed in #feed. Requires either the link or the `remove` keyword. e.g. `{mentionbot} source 1 https://....` or `{mentionbot} source 14939 remove`", inline=False)
     embed.add_field(name=f"{mentionbot} refresh", value=f"Refreshes an embed - checks if the metadata (i.e. description, air date, image) has changed and updates accordingly. e.g. `{mentionbot} refresh 40020`", inline=False)
     await ctx.channel.send(embed=embed)
