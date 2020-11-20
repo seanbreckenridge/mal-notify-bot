@@ -20,6 +20,7 @@ from asyncio import sleep
 from utils import *
 from utils.embeds import create_embed, refresh_embed, add_source, remove_source
 from utils.user import download_users_list  # currently not used
+from utils.forum import get_forum_links
 
 # setup project and discord.py logs
 logger = setup_logger(__name__, "bot", supress_stream_output=False)
@@ -286,31 +287,37 @@ async def test_log(ctx):
 @client.command()
 @has_privilege()
 @log
-async def source(ctx, mal_id: int, *, links):
+async def source(ctx, mal_id: int, *, links: str):
 
     with ctx.channel.typing():
         adding_source = True
-        if links.strip().lower() == "remove":
+        parse_from_forum = False
+        possible_command: str = links.strip().lower()
+        if possible_command == "remove":
             adding_source = False
+        if possible_command.startswith("forum"):
+            parse_from_forum = True
         logger.debug("{} source".format(
             "Adding" if adding_source else "Removing"))
 
+        valid_links = []
         if adding_source:
-            valid_links = []
-            # if there are multiple links, check each
-            for link in links.split():
-                # remove supression from link, if it exists
-                link = remove_discord_link_supression(link)
-
-                """# test if link exists; blocking
+            if parse_from_forum:
+                match_string = possible_command.split(" ", 1)[-1].strip()
+                if len(match_string) == 0:
+                    return await ctx.channel.send("Provide a link to match. e.g. 'forum youtube' or 'forum vimeo'")
                 try:
-                    resp = requests.get(link)
-                    sleep(0)
-                except requests.exceptions.MissingSchema:
-                    return await ctx.channel.send("`{}` has no schema (e.g. https), its not a valid URL.".format(link))
-                if not resp.status_code == requests.codes.ok:
-                    return await ctx.channel.send("Error connecting to <{}> with status code {}".format(link, resp.status_code))"""
-                valid_links.append(link)
+                    matched_link: str = await get_forum_links(mal_id, match_string, ctx=ctx)
+                    await ctx.channel.send("Matched <{}>".format(matched_link))
+                    valid_links.append(matched_link)
+                except RuntimeError as re:
+                    return await ctx.channel.send(str(re))
+            else:
+                # if there are multiple links, check each
+                for link in links.split():
+                    # remove supression from link, if it exists
+                    link = remove_discord_link_supression(link)
+                    valid_links.append(link)
 
         # get logs from feed
         message = await search_feed_for_mal_id(str(mal_id), client.feed_channel, limit=999999)
@@ -405,7 +412,7 @@ async def help(ctx):
     embed.add_field(name="'trusted' commands", value='\u200b', inline=False)
     embed.add_field(name=f"{mentionbot} add_new", value="Checks if any new items have been added in the last 10 minutes. Runs automatically at 10 minute intervals.", inline=False)
     embed.add_field(name=f"{mentionbot} restart", value="Restart the bot", inline=False)
-    embed.add_field(name=f"{mentionbot} source <mal_id> <links...|remove>", value=f"Adds a source to an embed in #feed. Requires either the link or the `remove` keyword. e.g. `{mentionbot} source 1 https://....` or `{mentionbot} source 14939 remove`", inline=False)
+    embed.add_field(name=f"{mentionbot} source <mal_id> <links...|remove|forum>", value=f"Adds a source to an embed in #feed. Requires either the link, the `remove` keyword. e.g. `{mentionbot} source 1 https://....` or `{mentionbot} source 14939 remove` or `{mentionbot} source 1 forum youtube` to search the forum for a source link matching 'youtube'", inline=False)
     embed.add_field(name=f"{mentionbot} refresh", value=f"Refreshes an embed - checks if the metadata (i.e. description, air date, image) has changed and updates accordingly. e.g. `{mentionbot} refresh 40020`", inline=False)
     await ctx.channel.send(embed=embed)
 

@@ -14,6 +14,7 @@ gitpython = "*"
 jikanpy = ">=4.1.0"
 backoff = "*"
 aiofiles = "*"
+bs4 = "*"
 
 [requires]
 python_version = "3.7"
