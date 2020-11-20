@@ -32,9 +32,8 @@ mal_id_cache_json_file = os.path.join(mal_id_cache_dir, "cache", "anime_cache.js
 token_file = os.path.join(root_dir, "token.yaml")
 
 # bot object
-client = commands.Bot(
-    command_prefix=commands.when_mentioned, case_insensitive=False)
-client.remove_command('help')  # remove default help
+client = commands.Bot(command_prefix=commands.when_mentioned, case_insensitive=False)
+client.remove_command("help")  # remove default help
 # amount of time to wait between checking for new entries
 client.period = 60 * 10
 
@@ -49,23 +48,24 @@ def truncate(obj, limit: int):
 
 def log(func):
     """Decorator for functions, to log start/end times"""
+
     @wraps(func)
     async def wrapper(*args, **kwargs):
         _id = uuid.get_and_increment()
         args_text = truncate(args, 2000)
         kwargs_text = truncate(kwargs, 2000)
-        logger.debug(
-            f"{func.__name__} ({_id}) called with {args_text} {kwargs_text}")
+        logger.debug(f"{func.__name__} ({_id}) called with {args_text} {kwargs_text}")
         if inspect.iscoroutinefunction(func):
             result = await func(*args, **kwargs)
         else:
             result = func(*args, **kwargs)
         logger.debug(f"{func.__name__} ({_id}) finished")
         return result
+
     return wrapper
 
 
-class FileState():
+class FileState:
     """Parent class for managing file states"""
 
     def __init__(self, filepath):
@@ -86,14 +86,14 @@ class OldDatabase(FileState):
 
     @log
     async def read(self):
-        async with aiofiles.open(self.filepath, mode='r') as old_f:
+        async with aiofiles.open(self.filepath, mode="r") as old_f:
             contents = await old_f.read()
             return set(contents.splitlines())
 
     @log
     async def dump(self, contents):
         contents = sorted(list(contents), key=int)
-        async with aiofiles.open(self.filepath, mode='w') as old_f:
+        async with aiofiles.open(self.filepath, mode="w") as old_f:
             await old_f.write("\n".join(contents))
             await old_f.flush()
 
@@ -110,7 +110,7 @@ async def update_git_repo():
 @log
 async def read_json_cache():
     """Reads the cache from mal-id-cache/cache.json and combines sfw ids with nsfw"""
-    async with aiofiles.open(mal_id_cache_json_file, mode='r') as cache_f:
+    async with aiofiles.open(mal_id_cache_json_file, mode="r") as cache_f:
         plain_text_contents = await cache_f.read()
     contents = json.loads(plain_text_contents)
     return list(map(str, contents["sfw"] + contents["nsfw"]))
@@ -118,21 +118,24 @@ async def read_json_cache():
 
 def is_admin_or_owner():
     """Check that returns True if the user is the owner/admin on the server"""
+
     async def predicate(ctx):
         is_owner = await ctx.bot.is_owner(ctx.author)
         is_admin = ctx.author.permissions_in(ctx.channel).administrator
         return is_owner or is_admin
+
     return commands.check(predicate)
 
 
 def has_privilege():
     """Check that returns true if the user can use 'trusted' commands or is owner/admin"""
+
     async def predicate(ctx):
         is_owner = await ctx.bot.is_owner(ctx.author)
         is_admin = ctx.author.permissions_in(ctx.channel).administrator
-        is_trusted = "trusted" in [role.name.lower()
-                                   for role in ctx.author.roles]
+        is_trusted = "trusted" in [role.name.lower() for role in ctx.author.roles]
         return is_owner or is_admin or is_trusted
+
     return commands.check(predicate)
 
 
@@ -146,8 +149,7 @@ async def on_ready():  # include so that on_ready event shows up in logs
 # which would ordinarily not trigger commands
 @client.event
 async def on_message(message):
-    message.content = re.sub(
-        "\s{2,}", " ", message.content)  # remove weird spaces
+    message.content = re.sub("\s{2,}", " ", message.content)  # remove weird spaces
     await client.process_commands(message)
 
 
@@ -206,8 +208,13 @@ async def add_new(ctx):
             return await ctx.channel.send("No new entries found.")
         else:
             entry_count = len(new_embeds)
-            await ctx.channel.send("Found {} new entr{}.".format(entry_count, "y" if entry_count == 1 else "ies"))
+            await ctx.channel.send(
+                "Found {} new entr{}.".format(
+                    entry_count, "y" if entry_count == 1 else "ies"
+                )
+            )
             return await print_new_embeds(new_embeds=new_embeds)
+
 
 @client.command()
 @has_privilege()
@@ -215,6 +222,7 @@ async def add_new(ctx):
 async def restart(ctx):
     await ctx.channel.send("Restarting...")
     sys.exit(0)
+
 
 @log
 async def create_new_embeds(ctx=None):
@@ -260,18 +268,29 @@ async def print_new_embeds(new_embeds=None):
             print_to_channel = client.feed_channel if sfw else client.nsfw_feed_channel
             new_mal_id = extract_mal_id_from_url(embed.url)
             if new_mal_id not in old_ids:  # make sure we're not printing entries twice
-                logger.debug("Printing {} to {}".format(
-                    new_mal_id, "#feed" if sfw else "#nsfw-feed"))
+                logger.debug(
+                    "Printing {} to {}".format(
+                        new_mal_id, "#feed" if sfw else "#nsfw-feed"
+                    )
+                )
                 await print_to_channel.send(embed=embed)
             # check that we actually printed the embed
-            printed_message = await search_feed_for_mal_id(mal_id=new_mal_id, channel=print_to_channel, limit=50)
+            printed_message = await search_feed_for_mal_id(
+                mal_id=new_mal_id, channel=print_to_channel, limit=50
+            )
             if printed_message:
                 logger.debug(
-                    "Found printed message in channel, adding {} to old ids".format(new_mal_id))
+                    "Found printed message in channel, adding {} to old ids".format(
+                        new_mal_id
+                    )
+                )
                 old_ids.add(new_mal_id)
             else:
                 logger.warning(
-                    "Couldnt find printed message for id {} in channel".format(new_mal_id))
+                    "Couldnt find printed message for id {} in channel".format(
+                        new_mal_id
+                    )
+                )
         await client.old_db.dump(old_ids)
 
 
@@ -297,17 +316,20 @@ async def source(ctx, mal_id: int, *, links: str):
             adding_source = False
         if possible_command.startswith("forum"):
             parse_from_forum = True
-        logger.debug("{} source".format(
-            "Adding" if adding_source else "Removing"))
+        logger.debug("{} source".format("Adding" if adding_source else "Removing"))
 
         valid_links = []
         if adding_source:
             if parse_from_forum:
                 match_string = possible_command.split(" ", 1)[-1].strip()
                 if len(match_string) == 0:
-                    return await ctx.channel.send("Provide a link to match. e.g. 'forum youtube' or 'forum vimeo'")
+                    return await ctx.channel.send(
+                        "Provide a link to match. e.g. 'forum youtube' or 'forum vimeo'"
+                    )
                 try:
-                    matched_link: str = await get_forum_links(mal_id, match_string, ctx=ctx)
+                    matched_link: str = await get_forum_links(
+                        mal_id, match_string, ctx=ctx
+                    )
                     await ctx.channel.send("Matched <{}>".format(matched_link))
                     valid_links.append(matched_link)
                 except RuntimeError as re:
@@ -320,19 +342,31 @@ async def source(ctx, mal_id: int, *, links: str):
                     valid_links.append(link)
 
         # get logs from feed
-        message = await search_feed_for_mal_id(str(mal_id), client.feed_channel, limit=999999)
+        message = await search_feed_for_mal_id(
+            str(mal_id), client.feed_channel, limit=999999
+        )
         if not message:
-            return await ctx.channel.send("Could not find a message that contains the MAL id {} in {}".format(mal_id, client.feed_channel.mention))
+            return await ctx.channel.send(
+                "Could not find a message that contains the MAL id {} in {}".format(
+                    mal_id, client.feed_channel.mention
+                )
+            )
         else:
             embed = message.embeds[0]
             if adding_source:
                 new_embed, is_new_source = add_source(embed, valid_links)
                 await message.edit(embed=new_embed)
-                return await ctx.channel.send("{} source for '{}' successfully.".format("Added" if is_new_source else "Replaced", embed.title))
+                return await ctx.channel.send(
+                    "{} source for '{}' successfully.".format(
+                        "Added" if is_new_source else "Replaced", embed.title
+                    )
+                )
             else:
                 new_embed = remove_source(embed)
                 await message.edit(embed=new_embed)
-                return await ctx.channel.send("Removed source for '{}' successfully.".format(embed.title))
+                return await ctx.channel.send(
+                    "Removed source for '{}' successfully.".format(embed.title)
+                )
 
 
 @client.command()
@@ -341,33 +375,47 @@ async def source(ctx, mal_id: int, *, links: str):
 async def refresh(ctx, mal_id: int):
     with ctx.channel.typing():
         remove_image = "remove image" in ctx.message.content.lower()
-        message = await search_feed_for_mal_id(str(mal_id), client.feed_channel, limit=999999)
+        message = await search_feed_for_mal_id(
+            str(mal_id), client.feed_channel, limit=999999
+        )
         if not message:  # search nsfw channel
-            message = await search_feed_for_mal_id(str(mal_id), client.nsfw_feed_channel, limit=999999) 
+            message = await search_feed_for_mal_id(
+                str(mal_id), client.nsfw_feed_channel, limit=999999
+            )
         if message:
             embed = message.embeds[0]
             new_embed = refresh_embed(embed, mal_id, remove_image, logger)
             await message.edit(embed=new_embed)
-            return await ctx.channel.send("{} for '{}' successfully.".format("Removed image" if remove_image else "Updated fields", embed.title))
+            return await ctx.channel.send(
+                "{} for '{}' successfully.".format(
+                    "Removed image" if remove_image else "Updated fields", embed.title
+                )
+            )
         else:
-            return await ctx.channel.send("Could not find a message that contains the MAL id {}".format(mal_id))
+            return await ctx.channel.send(
+                "Could not find a message that contains the MAL id {}".format(mal_id)
+            )
 
 
 @client.command()
 @log
 async def check(ctx, mal_username: str, num: int):
     # the request.get calls are synchronous - blocking, figure out a better way to implement this
-    #return await ctx.channel.send("This command is currently disabled.")
+    # return await ctx.channel.send("This command is currently disabled.")
     leftover_args = " ".join(ctx.message.content.strip().split()[4:])
     print_all = "all" in leftover_args.lower()
     print_not_completed = "not completed" in leftover_args.lower()
-    message = await ctx.channel.send("Downloading {}'s list (downloaded 0 anime entries...)".format(mal_username))
+    message = await ctx.channel.send(
+        "Downloading {}'s list (downloaded 0 anime entries...)".format(mal_username)
+    )
     parsed = {}
     for entries in download_users_list(mal_username):
         for e in entries:
-            parsed[e['mal_id']] = e['watching_status']
-        await message.edit(content=f"Downloading {mal_username}'s list (downloaded {len(parsed)} anime entries...)")
-        await sleep(0.5) # be nice to other tasks
+            parsed[e["mal_id"]] = e["watching_status"]
+        await message.edit(
+            content=f"Downloading {mal_username}'s list (downloaded {len(parsed)} anime entries...)"
+        )
+        await sleep(0.5)  # be nice to other tasks
     found_entry = False  # mark True if we find an entry the user hasnt watched
     async for message in client.feed_channel.history(limit=num, oldest_first=False):
         try:
@@ -376,44 +424,85 @@ async def check(ctx, mal_username: str, num: int):
             continue
         source_exists = "Source" in [f.name for f in embed.fields]
         if source_exists or print_all:
-            m = re.search(
-                "https:\/\/myanimelist\.net\/anime\/(\d+)", embed.url)
+            m = re.search("https:\/\/myanimelist\.net\/anime\/(\d+)", embed.url)
             mal_id = int(m.group(1))
             on_your_list = mal_id in parsed
             on_your_ptw = mal_id in parsed and parsed[mal_id] == 6
             on_your_completed = mal_id in parsed and parsed[mal_id] == 2
-            if (not on_your_list) or (on_your_ptw or (print_not_completed and not on_your_completed)):
+            if (not on_your_list) or (
+                on_your_ptw or (print_not_completed and not on_your_completed)
+            ):
                 found_entry = True
                 if source_exists:
-                    fixed_urls = " ".join(["<{}>".format(url) for url in [
-                                          f.value for f in embed.fields if f.name == "Source"][0].split()])
+                    fixed_urls = " ".join(
+                        [
+                            "<{}>".format(url)
+                            for url in [
+                                f.value for f in embed.fields if f.name == "Source"
+                            ][0].split()
+                        ]
+                    )
                     if on_your_ptw:
-                        await ctx.channel.send("{} is on your PTW, but it has a source: {}".format(embed.url, fixed_urls))
+                        await ctx.channel.send(
+                            "{} is on your PTW, but it has a source: {}".format(
+                                embed.url, fixed_urls
+                            )
+                        )
                     elif print_not_completed:
-                        await ctx.channel.send("{} is not on your Completed, but it has a source: {}".format(embed.url, fixed_urls))
+                        await ctx.channel.send(
+                            "{} is not on your Completed, but it has a source: {}".format(
+                                embed.url, fixed_urls
+                            )
+                        )
                     else:
-                        await ctx.channel.send("{} isn't on your list, but it has a source: {}".format(embed.url, fixed_urls))
+                        await ctx.channel.send(
+                            "{} isn't on your list, but it has a source: {}".format(
+                                embed.url, fixed_urls
+                            )
+                        )
                 else:
                     if print_all and not on_your_list:
-                        await ctx.channel.send("{} isn't on your list.".format(embed.url))
+                        await ctx.channel.send(
+                            "{} isn't on your list.".format(embed.url)
+                        )
 
     if not found_entry:
-        await ctx.channel.send("I couldn't find any MAL entries in the last {} entries that aren't on your list.".format(num))
+        await ctx.channel.send(
+            "I couldn't find any MAL entries in the last {} entries that aren't on your list.".format(
+                num
+            )
+        )
 
 
 @client.command()
 @log
 async def help(ctx):
     mentionbot = f"@{ctx.guild.me.display_name}"
-    embed=Embed(title="mal-notify help", color=0x4eb1ff)
-    embed.add_field(name="basic commands", value='\u200b', inline=False)
+    embed = Embed(title="mal-notify help", color=0x4EB1FF)
+    embed.add_field(name="basic commands", value="\u200b", inline=False)
     embed.add_field(name=f"{mentionbot} help", value="Show this message", inline=False)
-    embed.add_field(name=f"{mentionbot} check <mal_username> <n> [all]", value=f"Check the last 'n' in #feed entries for any items not on your MAL. Can add 'all' after the number of entries to check to list all items. By default only lists items which have sources. e.g. `{mentionbot} check Xinil 10 all`. `{mentionbot} check <mal_username> <n> not completed` will print any items that are not completed on your list which have a source in the last 'n' entries in #feed.", inline=False)
-    embed.add_field(name="'trusted' commands", value='\u200b', inline=False)
-    embed.add_field(name=f"{mentionbot} add_new", value="Checks if any new items have been added in the last 10 minutes. Runs automatically at 10 minute intervals.", inline=False)
+    embed.add_field(
+        name=f"{mentionbot} check <mal_username> <n> [all]",
+        value=f"Check the last 'n' in #feed entries for any items not on your MAL. Can add 'all' after the number of entries to check to list all items. By default only lists items which have sources. e.g. `{mentionbot} check Xinil 10 all`. `{mentionbot} check <mal_username> <n> not completed` will print any items that are not completed on your list which have a source in the last 'n' entries in #feed.",
+        inline=False,
+    )
+    embed.add_field(name="'trusted' commands", value="\u200b", inline=False)
+    embed.add_field(
+        name=f"{mentionbot} add_new",
+        value="Checks if any new items have been added in the last 10 minutes. Runs automatically at 10 minute intervals.",
+        inline=False,
+    )
     embed.add_field(name=f"{mentionbot} restart", value="Restart the bot", inline=False)
-    embed.add_field(name=f"{mentionbot} source <mal_id> <links...|remove|forum>", value=f"Adds a source to an embed in #feed. Requires either the link, the `remove` keyword. e.g. `{mentionbot} source 1 https://....` or `{mentionbot} source 14939 remove` or `{mentionbot} source 1 forum youtube` to search the forum for a source link matching 'youtube'", inline=False)
-    embed.add_field(name=f"{mentionbot} refresh", value=f"Refreshes an embed - checks if the metadata (i.e. description, air date, image) has changed and updates accordingly. e.g. `{mentionbot} refresh 40020`", inline=False)
+    embed.add_field(
+        name=f"{mentionbot} source <mal_id> <links...|remove|forum>",
+        value=f"Adds a source to an embed in #feed. Requires either the link, the `remove` keyword. e.g. `{mentionbot} source 1 https://....` or `{mentionbot} source 14939 remove` or `{mentionbot} source 1 forum youtube` to search the forum for a source link matching 'youtube'",
+        inline=False,
+    )
+    embed.add_field(
+        name=f"{mentionbot} refresh",
+        value=f"Refreshes an embed - checks if the metadata (i.e. description, air date, image) has changed and updates accordingly. e.g. `{mentionbot} refresh 40020`",
+        inline=False,
+    )
     await ctx.channel.send(embed=embed)
 
 
@@ -423,57 +512,91 @@ async def on_command_error(ctx, error):
     command_name = None
     if ctx.command:
         command_name = ctx.command.name
-    clean_message_content = ctx.message.content.split(
-        ">", maxsplit=1)[1].strip().replace("`", '')
+    clean_message_content = (
+        ctx.message.content.split(">", maxsplit=1)[1].strip().replace("`", "")
+    )
     args = clean_message_content.split()
 
     # prevent self-loops; on_command_error calling on_command_error
-    if hasattr(ctx.command, 'on_error'):
+    if hasattr(ctx.command, "on_error"):
         logger.warning("on_command_error self loop occured")
         return
 
     if isinstance(error, commands.CommandNotFound):
-        await ctx.channel.send("Could not find the command `{}`. Use `@notify help` to see a list of commands.".format(command_name))
+        await ctx.channel.send(
+            "Could not find the command `{}`. Use `@notify help` to see a list of commands.".format(
+                command_name
+            )
+        )
     elif isinstance(error, commands.CheckFailure):
-        await ctx.channel.send("You don't have sufficient permissions to run this command.")
-    elif isinstance(error, commands.MissingRequiredArgument) and command_name == "source":
-        await ctx.channel.send("You're missing one or more arguments for the `source` command.\nExample: `@notify source 31943 https://youtube/...`")
-    elif isinstance(error, commands.MissingRequiredArgument) and command_name == "refresh":
+        await ctx.channel.send(
+            "You don't have sufficient permissions to run this command."
+        )
+    elif (
+        isinstance(error, commands.MissingRequiredArgument) and command_name == "source"
+    ):
+        await ctx.channel.send(
+            "You're missing one or more arguments for the `source` command.\nExample: `@notify source 31943 https://youtube/...`"
+        )
+    elif (
+        isinstance(error, commands.MissingRequiredArgument)
+        and command_name == "refresh"
+    ):
         await ctx.channel.send("Provide the MAL id you wish to refresh the embed for.")
-    elif isinstance(error, commands.BadArgument) and command_name in ["source", "refresh"]:
+    elif isinstance(error, commands.BadArgument) and command_name in [
+        "source",
+        "refresh",
+    ]:
         try:
             int(args[1])
         except ValueError:
-            await ctx.channel.send("Error converting `{}` to an integer.".format(args[1]))
-    elif isinstance(error, commands.MissingRequiredArgument) and command_name == "check":
-        await ctx.channel.send("Provide your MAL username and then the number of entries in {} you want to check".format(client.feed_channel.mention))
+            await ctx.channel.send(
+                "Error converting `{}` to an integer.".format(args[1])
+            )
+    elif (
+        isinstance(error, commands.MissingRequiredArgument) and command_name == "check"
+    ):
+        await ctx.channel.send(
+            "Provide your MAL username and then the number of entries in {} you want to check".format(
+                client.feed_channel.mention
+            )
+        )
     elif isinstance(error, commands.BadArgument) and command_name == "check":
         try:
             int(args[2])
         except ValueError:
-            await ctx.channel.send("Error converting `{}` to an integer.".format(args[2]))
+            await ctx.channel.send(
+                "Error converting `{}` to an integer.".format(args[2])
+            )
     elif isinstance(error, commands.CommandInvokeError):
         original_error = error.original
         if isinstance(original_error, errors.HTTPException):
-            await ctx.channel.send("There was an issue connecting to the Discord API. Wait a few moments and try again.")
+            await ctx.channel.send(
+                "There was an issue connecting to the Discord API. Wait a few moments and try again."
+            )
         elif isinstance(original_error, RuntimeError):
             # couldn't find a user with that username
             await ctx.channel.send(str(original_error))
         elif isinstance(original_error, requests.exceptions.InvalidURL):
             await ctx.channel.send(f"Error with that URL: {str(original_error)}")
         else:
-            await ctx.channel.send("Uncaught error: {} - {}".format(type(error.original).__name__, error.original))
+            await ctx.channel.send(
+                "Uncaught error: {} - {}".format(
+                    type(error.original).__name__, error.original
+                )
+            )
             logger.exception(error.original)
-            logger.exception(
-                "".join(traceback.format_tb(error.original.__traceback__)))
+            logger.exception("".join(traceback.format_tb(error.original.__traceback__)))
     else:
-        await ctx.channel.send("Uncaught error: {} - {}".format(type(error).__name__, error))
+        await ctx.channel.send(
+            "Uncaught error: {} - {}".format(type(error).__name__, error)
+        )
         logger.exception(error, exc_info=True)
 
 
 if __name__ == "__main__":
     # Token is stored in token.yaml, with the key 'token'
-    with open(token_file, 'r') as t:
+    with open(token_file, "r") as t:
         token = yaml.load(t, Loader=yaml.FullLoader)["token"]
     client.loop.create_task(print_loop())  # waits until bot is ready
     client.run(token, bot=True, reconnect=True)

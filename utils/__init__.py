@@ -1,4 +1,3 @@
-
 import sys
 import os
 import re
@@ -8,6 +7,7 @@ import logging
 
 class uuid:
     """Represents function calls as processes so its easier to track where/when they start/end"""
+
     _id = 0
 
     @staticmethod
@@ -19,6 +19,7 @@ class uuid:
         uuid._id += 1
         return uuid._id
 
+
 # provide stream = None to not print to stdout/stderr
 
 
@@ -28,7 +29,8 @@ def setup_logger(name, logfile_name, supress_stream_output=False):
     LOGLEVEL = os.environ.get("LOGLEVEL", "DEBUG")
     logger.setLevel(LOGLEVEL)
     formatter = logging.Formatter(
-        '%(asctime)s %(levelname)s %(name)s/%(filename)s - %(message)s')
+        "%(asctime)s %(levelname)s %(name)s/%(filename)s - %(message)s"
+    )
     if not supress_stream_output:
         sh = logging.StreamHandler()
         sh.setFormatter(formatter)
