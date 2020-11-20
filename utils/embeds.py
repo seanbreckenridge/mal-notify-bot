@@ -6,13 +6,15 @@ import requests
 import jikanpy
 import backoff
 
+from . import fibo_long
+
 j = jikanpy.Jikan("http://localhost:8000/v3/")
 
 
 @backoff.on_exception(
-    backoff.fibo,  # fibonacci sequence backoff
+    fibo_long,  # fibonacci sequence backoff
     (jikanpy.exceptions.JikanException, jikanpy.exceptions.APIException),
-    max_tries=10,
+    max_tries=3,
 )
 def get_data(mal_id: int, ignore_image: bool, **kwargs):
     time.sleep(10)

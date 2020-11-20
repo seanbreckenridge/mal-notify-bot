@@ -4,13 +4,15 @@ import jikanpy
 import requests
 import backoff
 
+from . import fibo_long
+
 j = jikanpy.Jikan("http://localhost:8000/v3/")
 
 
 @backoff.on_exception(
-    backoff.fibo,  # fibonacci sequence backoff
+    fibo_long,  # fibonacci sequence backoff
     (jikanpy.exceptions.JikanException, jikanpy.exceptions.APIException),
-    max_tries=10,
+    max_tries=3,
     on_backoff=lambda x: print("backing off"),
 )
 def get_page(username, page):

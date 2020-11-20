@@ -4,6 +4,8 @@ import re
 import pickle
 import logging
 
+import backoff
+
 
 class uuid:
     """Represents function calls as processes so its easier to track where/when they start/end"""
@@ -55,3 +57,11 @@ def remove_discord_link_supression(link):
     if link.startswith("<") and link.endswith(">"):
         link = link[1:-1]
     return link
+
+
+def fibo_long():
+    f = backoff.fibo()
+    for _ in range(2):
+        next(f)
+    yield from f
+
