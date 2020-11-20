@@ -40,7 +40,6 @@ async def get_forum_links(mal_id: int, substring: str, ctx=None):
             )
         soup = BeautifulSoup(resp.text, "html.parser")
         for link in chain(soup.find_all("iframe"), soup.find_all("a")):
-            print(link.attrs)
             if "src" in link.attrs:
                 if substring in link.attrs["src"].lower():
                     return link.attrs["src"]
