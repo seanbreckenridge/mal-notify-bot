@@ -86,6 +86,7 @@ def create_embed(mal_id: int, logger):
         embed.set_thumbnail(url=image)
     embed = add_to_embed(embed, None, "Status", status, inline=True)
     embed = add_to_embed(embed, None, "Air Date", airdate, inline=True)
+    embed = add_to_embed(embed, None, "MAL ID", mal_id, inline=True)
     embed = add_to_embed(embed, None, "Synopsis", synopsis, inline=False)
     return embed, sfw
 
@@ -106,6 +107,7 @@ def refresh_embed(embed, mal_id: int, remove_image: bool, logger):
     new_embed = add_to_embed(new_embed, embed, "Status", status, inline=True)
     new_embed = add_to_embed(new_embed, embed, "Air Date", airdate, inline=True)
     new_embed = add_to_embed(new_embed, embed, "Synopsis", synopsis, inline=False)
+    embed = add_to_embed(embed, None, "MAL ID", mal_id, inline=True)
     new_embed = add_to_embed(new_embed, embed, "Source", None, inline=False)
     return new_embed
 
