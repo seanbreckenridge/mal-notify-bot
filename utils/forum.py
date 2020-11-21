@@ -1,5 +1,5 @@
-import time
 import re
+import asyncio
 
 from typing import List
 
@@ -21,8 +21,8 @@ j = jikanpy.Jikan("http://localhost:8000/v3/")
     max_tries=3,
     on_backoff=lambda x: print("backing off"),
 )
-def get_forum_resp(mal_id: int):
-    time.sleep(4)
+async def get_forum_resp(mal_id: int):
+    await asyncio.sleep(4)
     return j.anime(mal_id, extension="forum")
 
 
@@ -36,7 +36,7 @@ async def get_forum_links(mal_id: int, substring: str, ctx=None):
     for url in urls:
         if ctx:
             await ctx.channel.send("Searching <{}> for '{}'...".format(url, substring))
-        time.sleep(4)
+        await asyncio.sleep(4)
         resp = requests.get(url)
         if resp.status_code != 200:
             raise RuntimeError(
