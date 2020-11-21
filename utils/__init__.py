@@ -64,4 +64,3 @@ def fibo_long():
     for _ in range(2):
         next(f)
     yield from f
-
