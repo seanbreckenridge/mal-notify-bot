@@ -1,5 +1,5 @@
 import time
-from itertools import chain
+import re
 
 from typing import List
 
@@ -43,11 +43,9 @@ async def get_forum_links(mal_id: int, substring: str, ctx=None):
                 "Error requesting <{}>, try again in a few moments".format(url)
             )
         soup = BeautifulSoup(resp.text, "html.parser")
-        for link in chain(soup.find_all("iframe"), soup.find_all("a")):
-            if "src" in link.attrs:
-                if substring in link.attrs["src"].lower():
-                    return link.attrs["src"]
-            if "href" in link.attrs:
-                if substring in link.attrs["href"].lower():
-                    return link.attrs["href"]
+        for (selector, attr) in (("iframe", "src"), ("a", "href")):
+            for link in soup.find_all(selector):
+                if attr in link.attrs:
+                    if bool(re.search(substring, link.attrs[attr])):
+                        return link.attrs[attr]
     raise RuntimeError("Could not find any links that match '{}'".format(substring))

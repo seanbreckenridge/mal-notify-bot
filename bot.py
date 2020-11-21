@@ -494,8 +494,8 @@ async def help(ctx):
     )
     embed.add_field(name=f"{mentionbot} restart", value="Restart the bot", inline=False)
     embed.add_field(
-        name=f"{mentionbot} source <mal_id> <links...|remove|forum>",
-        value=f"Adds a source to an embed in #feed. Requires either the link, the `remove` keyword. e.g. `{mentionbot} source 1 https://....` or `{mentionbot} source 14939 remove` or `{mentionbot} source 1 forum youtube` to search the forum for a source link matching 'youtube'",
+        name=f"{mentionbot} source <mal_id> <links...|remove|forum match_link_regex>",
+        value=f"Adds a source to an embed in #feed. Requires either the link, the `remove` keyword. e.g. `{mentionbot} source 1 https://....` or `{mentionbot} source 14939 remove` or `{mentionbot} source 1 forum youtube|vimeo` to search the forum for a source link matching 'youtube' or 'vimeo'",
         inline=False,
     )
     embed.add_field(
