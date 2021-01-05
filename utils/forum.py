@@ -30,7 +30,8 @@ async def get_forum_resp(mal_id: int):
 async def get_forum_links(mal_id: int, substring: str, ctx=None):
     if ctx:
         await ctx.channel.send("Requesting MAL forum pages...")
-    urls: List[str] = [blob["url"] for blob in get_forum_resp(mal_id)["topics"]]
+    resp = await get_forum_resp(mal_id)
+    urls: List[str] = [blob["url"] for blob in resp["topics"]]
     if len(urls) == 0:
         raise RuntimeError("Could not find any forum links for that MAL page...")
     for url in urls:
