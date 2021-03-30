@@ -12,7 +12,7 @@ import requests
 import aiofiles
 import git
 
-from discord import errors, Message, Embed
+from discord import errors, Message, Embed, DiscordException
 from discord.ext import commands
 from discord.utils import get
 from asyncio import sleep
@@ -280,16 +280,17 @@ async def print_new_embeds(new_embeds=None):
             )
             if printed_message:
                 logger.debug(
-                    "Found printed message in channel, adding {} to old ids".format(
-                        new_mal_id
-                    )
+                    f"Found printed message in channel, adding {new_mal_id} to old ids"
                 )
+                logger.debug("Attempting to publish message...")
+                try:
+                    await printed_message.publish()
+                except DiscordException as publish_err:
+                    logger.warning(f"Couldn't publish message {publish_err}")
                 old_ids.add(new_mal_id)
             else:
                 logger.warning(
-                    "Couldnt find printed message for id {} in channel".format(
-                        new_mal_id
-                    )
+                    f"Couldnt find printed message for id {new_mal_id} in channel"
                 )
         await client.old_db.dump(old_ids)
 
@@ -420,7 +421,7 @@ async def check(ctx, mal_username: str, num: int):
     async for message in client.feed_channel.history(limit=num, oldest_first=False):
         try:
             embed = message.embeds[0]
-        except Exception as e:
+        except Exception:
             continue
         source_exists = "Source" in [f.name for f in embed.fields]
         if source_exists or print_all:
