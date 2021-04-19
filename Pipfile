@@ -6,7 +6,6 @@ verify_ssl = true
 [dev-packages]
 autopep8 = "*"
 mypy = "*"
-black = "*"
 
 [packages]
 pyyaml = ">=5.4"
