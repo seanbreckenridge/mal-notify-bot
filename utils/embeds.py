@@ -49,6 +49,7 @@ def embed_value_helper(embed_dict, name):
     for f in embed_dict.fields:
         if f.name == name:
             return f.value
+    raise RuntimeError("Could not find {} on embed object".format(name))
 
 
 def add_to_embed(discord_embed_object, embed_dict, name, value, inline):
@@ -106,8 +107,8 @@ def refresh_embed(embed, mal_id: int, remove_image: bool, logger):
         new_embed.set_thumbnail(url=image)
     new_embed = add_to_embed(new_embed, embed, "Status", status, inline=True)
     new_embed = add_to_embed(new_embed, embed, "Air Date", airdate, inline=True)
+    new_embed = add_to_embed(new_embed, embed, "MAL ID", mal_id, inline=True)
     new_embed = add_to_embed(new_embed, embed, "Synopsis", synopsis, inline=False)
-    embed = add_to_embed(embed, None, "MAL ID", mal_id, inline=True)
     new_embed = add_to_embed(new_embed, embed, "Source", None, inline=False)
     return new_embed
 
@@ -121,6 +122,7 @@ def add_source(embed, valid_links):
     is_new_source = "Source" not in [f.name for f in embed.fields]
     new_embed = add_to_embed(new_embed, embed, "Status", None, inline=True)
     new_embed = add_to_embed(new_embed, embed, "Air Date", None, inline=True)
+    new_embed = add_to_embed(new_embed, embed, "MAL ID", None, inline=True)
     new_embed = add_to_embed(new_embed, embed, "Synopsis", None, inline=True)
     new_embed = add_to_embed(
         new_embed, embed, "Source", " ".join(valid_links), inline=False
@@ -137,6 +139,7 @@ def remove_source(embed):
         new_embed.set_thumbnail(url=embed.thumbnail.url)
     new_embed = add_to_embed(new_embed, embed, "Status", None, inline=True)
     new_embed = add_to_embed(new_embed, embed, "Air Date", None, inline=True)
+    new_embed = add_to_embed(new_embed, embed, "MAL ID", None, inline=True)
     new_embed = add_to_embed(new_embed, embed, "Synopsis", None, inline=False)
     return new_embed
 
