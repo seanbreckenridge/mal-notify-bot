@@ -29,7 +29,7 @@ async def get_data(
 
     if logger:
         logger.debug("Sleeping before MAL request...")
-    asyncio.sleep(10)
+    await asyncio.sleep(10)
 
     # return values
     name: str
