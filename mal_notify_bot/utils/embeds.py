@@ -1,36 +1,55 @@
 import re
 import time
 import logging
+import asyncio
+from typing import List
 
-import discord
-import requests
 import jikanpy
-import backoff
+import discord  # type: ignore[import]
+import backoff  # type: ignore[import]
 
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 
-from . import fibo_long
+from . import fibo_long, log
 
-j = jikanpy.Jikan("http://localhost:8000/v3/")
+j = jikanpy.AioJikan("http://localhost:8000/v3/")
 
 
+@log
 @backoff.on_exception(
     fibo_long,  # fibonacci sequence backoff
     (jikanpy.exceptions.JikanException, jikanpy.exceptions.APIException),
     max_tries=3,
 )
-def get_data(mal_id: int, ignore_image: bool, **kwargs: logging.Logger):
-    time.sleep(10)
-    name = image = synopsis = sfw = airdate = status = None
+async def get_data(
+    mal_id: int, ignore_image: bool, **kwargs: logging.Logger
+) -> Tuple[str, Optional[str], Optional[str], bool, Optional[str], str]:
+
     logger: Optional[logging.Logger] = kwargs.get("logger", None)
-    resp: Dict[str, Any] = j.anime(mal_id)
-    name: str = resp["title"]
+
+    if logger:
+        logger.debug("Sleeping before MAL request...")
+    asyncio.sleep(10)
+
+    # return values
+    name: str
+    image: Optional[str] = None
+    synopsis: Optional[str] = None
+    airdate: Optional[str] = None
+    status: Optional[str] = None
+    sfw: bool
+
+    resp: Dict[str, Any] = await j.anime(mal_id)
+    name = str(resp["title"])
     if not ignore_image:
-        image: Optional[str] = resp["image_url"]
-    if image.startswith("https://myanimelist.cdn-dena.com/img/sp/icon/"):
+        image = resp["image_url"]
+    # no image, default 'MAL' icon
+    if image is not None and image.startswith(
+        "https://myanimelist.cdn-dena.com/img/sp/icon/"
+    ):
         image = None
     # return something so that there form POST has value incase synopsis is empty
-    synopsis: str = resp.get("synopsis", "No Synopsis")
+    synopsis = resp.get("synopsis", "No Synopsis")
     if synopsis is not None:
         synopsis.replace("\r", "")
         synopsis = re.sub("\n\s*\n", "\n", synopsis.strip()).strip()
@@ -38,13 +57,13 @@ def get_data(mal_id: int, ignore_image: bool, **kwargs: logging.Logger):
             synopsis = synopsis[:400].strip() + "..."
         if synopsis.strip() == "":
             synopsis = "No Synopsis"
-    status: str = resp["status"]
-    airdate: Optional[str] = resp["aired"].get("string", None)
-    sfw: bool = 12 not in [g["mal_id"] for g in resp["genres"]]
+    status = str(resp["status"])
+    airdate = resp["aired"].get("string", None)
+    sfw = 12 not in [g["mal_id"] for g in resp["genres"]]
     return name, image, synopsis, sfw, airdate, status
 
 
-def embed_value_helper(embed_dict, name):
+def embed_value_helper(embed_dict: Any, name: str) -> Any:
     """Only call this when you know that the value is in the embed, returns the value for the name"""
     for f in embed_dict.fields:
         if f.name == name:
@@ -52,7 +71,13 @@ def embed_value_helper(embed_dict, name):
     raise RuntimeError("Could not find {} on embed object".format(name))
 
 
-def add_to_embed(discord_embed_object, embed_dict, name, value, inline):
+def add_to_embed(
+    discord_embed_object: discord.Embed,
+    embed_dict: Any,
+    name: str,
+    value: Any,
+    inline: bool,
+) -> discord.Embed:
     if embed_dict is not None:
         # this was already in the embed_dict
         if name in [f.name for f in embed_dict.fields]:
@@ -74,8 +99,9 @@ def add_to_embed(discord_embed_object, embed_dict, name, value, inline):
     return discord_embed_object
 
 
-def create_embed(mal_id: int, logger):
-    title, image, synopsis, sfw, airdate, status = get_data(
+@log
+async def create_embed(mal_id: int, logger: logging.Logger) -> discord.Embed:
+    title, image, synopsis, sfw, airdate, status = await get_data(
         mal_id, False, logger=logger
     )
     embed = discord.Embed(
@@ -92,8 +118,11 @@ def create_embed(mal_id: int, logger):
     return embed, sfw
 
 
-def refresh_embed(embed, mal_id: int, remove_image: bool, logger):
-    title, image, synopsis, _, airdate, status = get_data(
+@log
+async def refresh_embed(
+    embed: discord.Embed, mal_id: int, remove_image: bool, logger: logging.Logger
+) -> discord.Embed:
+    title, image, synopsis, _, airdate, status = await get_data(
         mal_id, remove_image, logger=logger
     )
     if synopsis is not None and len(synopsis) > 400:
@@ -113,7 +142,8 @@ def refresh_embed(embed, mal_id: int, remove_image: bool, logger):
     return new_embed
 
 
-def add_source(embed, valid_links):
+@log
+async def add_source(embed: discord.Embed, valid_links: List[str]) -> discord.Embed:
     new_embed = discord.Embed(
         title=embed.title, url=embed.url, color=discord.Color.dark_blue()
     )
@@ -130,7 +160,8 @@ def add_source(embed, valid_links):
     return new_embed, is_new_source
 
 
-def remove_source(embed):
+@log
+async def remove_source(embed: discord.Embed) -> discord.Embed:
     new_embed = discord.Embed(
         title=embed.title, url=embed.url, color=discord.Color.dark_blue()
     )
@@ -142,11 +173,3 @@ def remove_source(embed):
     new_embed = add_to_embed(new_embed, embed, "MAL ID", None, inline=True)
     new_embed = add_to_embed(new_embed, embed, "Synopsis", None, inline=False)
     return new_embed
-
-
-# basic test to see what data is returned from MAL
-if __name__ == "__main__":
-    import sys
-
-    mid = int(sys.argv[1])
-    print(get_data(mid, False))

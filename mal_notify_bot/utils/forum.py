@@ -1,15 +1,16 @@
 import re
 import asyncio
 
-from typing import List
+from typing import List, Optional, Dict, Any
 
 import requests
 import jikanpy
-import backoff
+import backoff  # type: ignore[import]
+from discord.ext.commands import Context  # type: ignore[import]
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup  # type: ignore[import]
 
-from . import fibo_long
+from . import fibo_long, log
 
 
 j = jikanpy.Jikan("http://localhost:8000/v3/")
@@ -21,13 +22,18 @@ j = jikanpy.Jikan("http://localhost:8000/v3/")
     max_tries=3,
     on_backoff=lambda x: print("backing off"),
 )
-async def get_forum_resp(mal_id: int):
+@log
+async def get_forum_resp(mal_id: int) -> Dict[str, Any]:
     await asyncio.sleep(4)
-    return j.anime(mal_id, extension="forum")
+    resp: Dict[str, Any] = j.anime(mal_id, extension="forum")
+    return resp
 
 
 # match any forum posts whose link contains 'substring'
-async def get_forum_links(mal_id: int, substring: str, ctx=None):
+@log
+async def get_forum_links(
+    mal_id: int, substring: str, ctx: Optional[Context] = None
+) -> str:
     if ctx:
         await ctx.channel.send("Requesting MAL forum pages...")
     resp = await get_forum_resp(mal_id)

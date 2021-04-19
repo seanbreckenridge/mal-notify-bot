@@ -5,6 +5,8 @@ verify_ssl = true
 
 [dev-packages]
 autopep8 = "*"
+mypy = "*"
+black = "*"
 
 [packages]
 pyyaml = ">=5.4"
@@ -16,6 +18,4 @@ jikanpy = ">=4.1.0"
 backoff = "*"
 aiofiles = "*"
 bs4 = "*"
-
-[requires]
-python_version = "3.7"
+logzero = "*"
