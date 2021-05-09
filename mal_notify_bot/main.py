@@ -4,6 +4,7 @@ import re
 import json
 import traceback
 
+from typing import Dict, Optional, List
 from asyncio import sleep
 
 import yaml
@@ -12,7 +13,7 @@ import aiofiles
 import git  # type: ignore[import]
 from logzero import logger  # type: ignore[import]
 
-from discord import errors, Message, Embed, DiscordException, TextChannel  # type: ignore[import]
+from discord import errors, File, Message, Embed, DiscordException, TextChannel  # type: ignore[import]
 from discord.ext import commands  # type: ignore[import]
 from discord.utils import get  # type: ignore[import]
 
@@ -22,7 +23,13 @@ from .utils import (
     log,
     remove_discord_link_supression,
 )
-from .utils.embeds import create_embed, refresh_embed, add_source, remove_source
+from .utils.embeds import (
+    create_embed,
+    refresh_embed,
+    add_source,
+    remove_source,
+    get_source,
+)
 from .utils.user import download_users_list  # currently not used
 from .utils.forum import get_forum_links
 
@@ -31,11 +38,15 @@ mal_id_cache_dir = os.path.join(root_dir, "mal-id-cache")
 mal_id_cache_json_file = os.path.join(mal_id_cache_dir, "cache", "anime_cache.json")
 token_file = os.path.join(root_dir, "token.yaml")
 
+# file to export sources as a backup
+export_file = os.path.join(root_dir, "export.json")
+
 # bot object
 client = commands.Bot(command_prefix=commands.when_mentioned, case_insensitive=False)
 client.remove_command("help")  # remove default help
 # amount of time to wait between checking for new entries
 client.period = 60 * 10
+client.export_period = 60 * 60 * 6  # once every 6 hours
 
 
 class FileState:
@@ -147,9 +158,60 @@ async def search_feed_for_mal_id(
     return None  # if we've exited the loop
 
 
+async def _export_channel(channel) -> Dict[int, str]:
+    results = {}
+    async for message in channel.history(limit=99999, oldest_first=False):
+        try:
+            embed = message.embeds[0]
+        except:
+            continue
+        else:
+            embed_id: Optional[int] = extract_mal_id_from_url(embed.url)
+            if embed_id is not None:
+                source: Optional[str] = get_source(embed)
+                if source is None:
+                    continue
+                results[embed_id] = source
+    return results
+
+
+@log
+async def run_export() -> None:
+    """
+    Iterates through all the messages in the feeds
+    saving any sources to a JSON file
+    """
+
+    feed_results: Dict[int, str] = await _export_channel(client.feed_channel)
+    nsfw_feed_results: Dict[int, str] = await _export_channel(client.nsfw_feed_channel)
+    feed_results.update(nsfw_feed_results)
+    with open(export_file, "w") as f:
+        f.write(json.dumps(feed_results))
+    return feed_results
+
+
+@client.command()
+@has_privilege()
+@log
+async def export(ctx):
+    with ctx.channel.typing():
+        results = await run_export()
+        await ctx.channel.send(file=File(export_file))
+
+
+async def export_loop():
+    await client.wait_until_ready()
+    assert client.feed_channel is not None
+    assert client.nsfw_feed_channel is not None
+    while not client.is_closed():
+        # save to JSON file
+        await sleep(client.export_period)
+        await run_export()
+
+
 # run in event loop
 @log
-async def print_loop():
+async def print_loop() -> None:
     """main loop - checks if entries exist periodically and prints them"""
     await client.wait_until_ready()
     # setup global variables
@@ -166,6 +228,7 @@ async def print_loop():
     if client.nsfw_feed_channel is None:
         logger.critical("Couldn't find the 'nsfw-feed' channel")
     client.old_db = OldDatabase(filepath=os.path.join(root_dir, "old"))
+    client.loop.create_task(export_loop())
     while not client.is_closed():
         # if there are new entries, print them
         await print_new_embeds()
@@ -469,6 +532,7 @@ async def help(ctx):
         inline=False,
     )
     embed.add_field(name=f"{mentionbot} restart", value="Restart the bot", inline=False)
+    embed.add_field(name=f"{mentionbot} export", value="Create a backup of all of the sources", inline=False)
     embed.add_field(
         name=f"{mentionbot} source <mal_id> <links...|remove|forum match_link_regex>",
         value=f"Adds a source to an embed in #feed. Requires either the link, the `remove` keyword. e.g. `{mentionbot} source 1 https://....` or `{mentionbot} source 14939 remove` or `{mentionbot} source 1 forum youtube|vimeo` to search the forum for a source link matching 'youtube' or 'vimeo'",

@@ -173,3 +173,10 @@ async def remove_source(embed: discord.Embed) -> discord.Embed:
     new_embed = add_to_embed(new_embed, embed, "MAL ID", None, inline=True)
     new_embed = add_to_embed(new_embed, embed, "Synopsis", None, inline=False)
     return new_embed
+
+
+def get_source(embed: discord.Embed) -> Optional[str]:
+    for embed_proxy in embed.fields:
+        if embed_proxy.name == "Source":
+            return embed_proxy.value
+    return None
