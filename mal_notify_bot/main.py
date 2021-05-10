@@ -186,7 +186,7 @@ async def run_export() -> None:
     nsfw_feed_results: Dict[int, str] = await _export_channel(client.nsfw_feed_channel)
     feed_results.update(nsfw_feed_results)
     with open(export_file, "w") as f:
-        f.write(json.dumps(feed_results))
+        f.write(json.dumps(feed_results, sort_keys=True, indent=4))
     return feed_results
 
 
