@@ -447,13 +447,13 @@ async def check(ctx: commands.Context, mal_username: str, num: int) -> None:
         "Downloading {}'s list (downloaded 0 anime entries...)".format(mal_username)
     )
     parsed = {}
-    async for entries in download_users_list(mal_username):
+    for entries in download_users_list(mal_username):
         for e in entries:
             parsed[e["mal_id"]] = e["watching_status"]
         await message.edit(
             content=f"Downloading {mal_username}'s list (downloaded {len(parsed)} anime entries...)"
         )
-        await sleep(0.5)  # be nice to other tasks
+        await sleep(0.5)  # be nice to other async tasks
     found_entry = False  # mark True if we find an entry the user hasnt watched
     async for message in client.feed_channel.history(limit=num, oldest_first=False):
         try:
