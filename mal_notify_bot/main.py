@@ -3,8 +3,9 @@ import sys
 import re
 import json
 import traceback
+import pathlib
 
-from typing import Dict, Optional, List
+from typing import Dict, Optional
 from asyncio import sleep
 
 import yaml
@@ -13,7 +14,7 @@ import aiofiles
 import git  # type: ignore[import]
 from logzero import logger  # type: ignore[import]
 
-from discord import errors, File, Message, Embed, DiscordException, TextChannel  # type: ignore[import]
+from discord import errors, File, Message, Embed, TextChannel  # type: ignore[import]
 from discord.ext import commands  # type: ignore[import]
 from discord.utils import get  # type: ignore[import]
 
@@ -37,6 +38,12 @@ root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardi
 mal_id_cache_dir = os.path.join(root_dir, "mal-id-cache")
 mal_id_cache_json_file = os.path.join(mal_id_cache_dir, "cache", "anime_cache.json")
 token_file = os.path.join(root_dir, "token.yaml")
+
+old_db_file = os.path.join(root_dir, "old")
+assert os.path.exists(old_db_file)
+# arbitrary check to make sure the olddb isnt empty
+assert len(pathlib.Path(old_db_file).read_text()) > 1000
+
 
 # file to export sources as a backup
 export_file = os.path.join(root_dir, "export.json")
@@ -140,7 +147,7 @@ async def on_message(message):
 @log
 async def search_feed_for_mal_id(
     mal_id: int, channel: TextChannel, limit: int
-) -> Message:
+) -> Optional[Message]:
     """
     checks a feed channel (which is filled with embeds) for a message
     returns the discord.Message object if it finds it within limit, else return None
@@ -158,7 +165,7 @@ async def search_feed_for_mal_id(
     return None  # if we've exited the loop
 
 
-async def _export_channel(channel) -> Dict[int, str]:
+async def _export_channel(channel: TextChannel) -> Dict[str, str]:
     results = {}
     async for message in channel.history(limit=99999, oldest_first=False):
         try:
@@ -166,7 +173,7 @@ async def _export_channel(channel) -> Dict[int, str]:
         except:
             continue
         else:
-            embed_id: Optional[int] = extract_mal_id_from_url(embed.url)
+            embed_id: Optional[str] = extract_mal_id_from_url(embed.url)
             if embed_id is not None:
                 source: Optional[str] = get_source(embed)
                 if source is None:
@@ -182,12 +189,11 @@ async def run_export() -> None:
     saving any sources to a JSON file
     """
 
-    feed_results: Dict[int, str] = await _export_channel(client.feed_channel)
-    nsfw_feed_results: Dict[int, str] = await _export_channel(client.nsfw_feed_channel)
+    feed_results: Dict[str, str] = await _export_channel(client.feed_channel)
+    nsfw_feed_results: Dict[str, str] = await _export_channel(client.nsfw_feed_channel)
     feed_results.update(nsfw_feed_results)
     with open(export_file, "w") as f:
         f.write(json.dumps(feed_results, sort_keys=True, indent=4))
-    return feed_results
 
 
 @client.command()
@@ -195,7 +201,7 @@ async def run_export() -> None:
 @log
 async def export(ctx):
     with ctx.channel.typing():
-        results = await run_export()
+        await run_export()
         await ctx.channel.send(file=File(export_file))
 
 
@@ -227,7 +233,7 @@ async def print_loop() -> None:
         logger.critical("Couldn't find the 'feed' channel")
     if client.nsfw_feed_channel is None:
         logger.critical("Couldn't find the 'nsfw-feed' channel")
-    client.old_db = OldDatabase(filepath=os.path.join(root_dir, "old"))
+    client.old_db = OldDatabase(filepath=old_db_file)
     client.loop.create_task(export_loop())
     while not client.is_closed():
         # if there are new entries, print them
@@ -302,34 +308,52 @@ async def print_new_embeds(new_embeds=None):
         new_embeds = await create_new_embeds()
     if new_embeds:
         old_ids = await client.old_db.read()
+        # prevent broken old files from printing a bunch of messages
+        assert len(old_ids) > 1000
         for embed, sfw in new_embeds:
             print_to_channel = client.feed_channel if sfw else client.nsfw_feed_channel
             new_mal_id = extract_mal_id_from_url(embed.url)
-            if new_mal_id not in old_ids:  # make sure we're not printing entries twice
+            # check if that message already exists in the channel
+            previous_message = await search_feed_for_mal_id(
+                mal_id=new_mal_id, channel=print_to_channel, limit=1000
+            )
+            if previous_message is not None:
+                logger.debug(
+                    f"While attempting to print new id {new_mal_id}, found previously printed message: {previous_message}"
+                )
+            else:
+                logger.debug(
+                    f"Couldnt find any message with id {new_mal_id}, printing new message"
+                )
+            if (
+                new_mal_id not in old_ids and previous_message is None
+            ):  # make sure we're not printing entries twice
                 logger.debug(
                     "Printing {} to {}".format(
                         new_mal_id, "#feed" if sfw else "#nsfw-feed"
                     )
                 )
                 await print_to_channel.send(embed=embed)
+            await sleep(2)
             # check that we actually printed the embed
             printed_message = await search_feed_for_mal_id(
-                mal_id=new_mal_id, channel=print_to_channel, limit=50
+                mal_id=new_mal_id, channel=print_to_channel, limit=1000
             )
             if printed_message:
                 logger.debug(
                     f"Found printed message in channel, adding {new_mal_id} to old ids"
                 )
+                old_ids.add(new_mal_id)
                 logger.debug("Attempting to publish message...")
                 try:
                     await printed_message.publish()
-                except DiscordException as publish_err:
+                except Exception as publish_err:
                     logger.warning(f"Couldn't publish message {publish_err}")
-                old_ids.add(new_mal_id)
             else:
                 logger.warning(
                     f"Couldnt find printed message for id {new_mal_id} in channel"
                 )
+                sys.exit(1)
         await client.old_db.dump(old_ids)
 
 
@@ -532,7 +556,11 @@ async def help(ctx):
         inline=False,
     )
     embed.add_field(name=f"{mentionbot} restart", value="Restart the bot", inline=False)
-    embed.add_field(name=f"{mentionbot} export", value="Create a backup of all of the sources", inline=False)
+    embed.add_field(
+        name=f"{mentionbot} export",
+        value="Create a backup of all of the sources",
+        inline=False,
+    )
     embed.add_field(
         name=f"{mentionbot} source <mal_id> <links...|remove|forum match_link_regex>",
         value=f"Adds a source to an embed in #feed. Requires either the link, the `remove` keyword. e.g. `{mentionbot} source 1 https://....` or `{mentionbot} source 14939 remove` or `{mentionbot} source 1 forum youtube|vimeo` to search the forum for a source link matching 'youtube' or 'vimeo'",

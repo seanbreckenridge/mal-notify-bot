@@ -1,5 +1,4 @@
 import time
-import asyncio
 
 import jikanpy
 import requests
@@ -7,7 +6,7 @@ import backoff  # type: ignore[import]
 
 from typing import Dict, Any, Iterator, List
 
-from . import fibo_long, log
+from . import fibo_long
 
 j = jikanpy.Jikan("http://localhost:8000/v3/")
 
