@@ -316,7 +316,7 @@ async def print_new_embeds(new_embeds=None):
             new_mal_id = extract_mal_id_from_url(embed.url)
             # check if that message already exists in the channel
             previous_message = await search_feed_for_mal_id(
-                mal_id=new_mal_id, channel=print_to_channel, limit=1000
+                mal_id=new_mal_id, channel=print_to_channel, limit=99999
             )
             if previous_message is not None:
                 logger.debug(
@@ -338,7 +338,7 @@ async def print_new_embeds(new_embeds=None):
             await sleep(2)
             # check that we actually printed the embed
             printed_message = await search_feed_for_mal_id(
-                mal_id=new_mal_id, channel=print_to_channel, limit=1000
+                mal_id=new_mal_id, channel=print_to_channel, limit=99999
             )
             if printed_message:
                 logger.debug(
