@@ -261,7 +261,7 @@ async def add_new(ctx):
 
 
 @client.command()
-@has_privilege()
+@is_admin_or_owner()
 @log
 async def restart(ctx):
     await ctx.channel.send("Restarting...")
@@ -364,6 +364,17 @@ async def test_log(ctx):
     message = "test message. beep boop"
     await client.feed_channel.send(message)
     await client.nsfw_feed_channel.send(message)
+
+
+@client.command()
+@is_admin_or_owner()
+@log
+async def index(ctx, pages: int):
+    # communicates with the https://github.com/Hiyori-API/checker_mal
+    # instance to tell it to index more pages
+    resp = requests.get(f"http://localhost:4001/api/pages?type=anime&pages={pages}")
+    resp.raise_for_status()
+    await ctx.channel.send(f"Successfully submitted request to index {pages} anime pages")
 
 
 @client.command()
@@ -555,15 +566,14 @@ async def help(ctx):
         value="Checks if any new items have been added in the last 10 minutes. Runs automatically at 10 minute intervals.",
         inline=False,
     )
-    embed.add_field(name=f"{mentionbot} restart", value="Restart the bot", inline=False)
-    embed.add_field(
-        name=f"{mentionbot} export",
-        value="Create a backup of all of the sources",
-        inline=False,
-    )
     embed.add_field(
         name=f"{mentionbot} source <mal_id> <links...|remove|forum match_link_regex>",
         value=f"Adds a source to an embed in #feed. Requires either the link, the `remove` keyword. e.g. `{mentionbot} source 1 https://....` or `{mentionbot} source 14939 remove` or `{mentionbot} source 1 forum youtube|vimeo` to search the forum for a source link matching 'youtube' or 'vimeo'",
+        inline=False,
+    )
+    embed.add_field(
+        name=f"{mentionbot} export",
+        value="Create a backup of all of the sources",
         inline=False,
     )
     embed.add_field(
@@ -571,6 +581,9 @@ async def help(ctx):
         value=f"Refreshes an embed - checks if the metadata (i.e. description, air date, image) has changed and updates accordingly. e.g. `{mentionbot} refresh 40020`",
         inline=False,
     )
+    embed.add_field(name="'admin' commands", value="\u200b", inline=False)
+    embed.add_field(name=f"{mentionbot} restart", value="Restart the bot", inline=False)
+    embed.add_field(name=f"{mentionbot} index <pages>", value="Communicate with the process that indexes MAL, asking it to search <pages> of recently approved MAL entries for newly approved items", inline=False)
     await ctx.channel.send(embed=embed)
 
 
@@ -614,6 +627,7 @@ async def on_command_error(ctx, error):
     elif isinstance(error, commands.BadArgument) and command_name in [
         "source",
         "refresh",
+        "index",
     ]:
         try:
             int(args[1])
