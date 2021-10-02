@@ -286,6 +286,7 @@ async def create_new_embeds(ctx=None):
         old_ids = await client.old_db.read()
         new_ids = sorted(list(set(ids) - set(old_ids)))
         logger.debug(f"new ids: {truncate(new_ids, 200)}")
+        logger.debug(f"({len(new_ids)} new ids)")
 
     # couldnt have possibly be 1000 entries approved since we last checked
     # this means there was an error writing to old_db
