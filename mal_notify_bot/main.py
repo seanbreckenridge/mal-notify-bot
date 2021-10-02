@@ -370,7 +370,7 @@ async def test_log(ctx):
 @client.command()
 @is_admin_or_owner()
 @log
-async def index(ctx, pages: int):
+async def index(ctx: commands.Context, pages: int) -> None:
     # communicates with the https://github.com/Hiyori-API/checker_mal
     # instance to tell it to index more pages
     resp = requests.get(f"http://localhost:4001/api/pages?type=anime&pages={pages}")
