@@ -33,6 +33,7 @@ from .utils.embeds import (
 )
 from .utils.user import download_users_list  # currently not used
 from .utils.forum import get_forum_links
+from .utils.external import get_official_link
 
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir))
 mal_id_cache_dir = os.path.join(root_dir, "mal-id-cache")
@@ -386,11 +387,14 @@ async def source(ctx: commands.Context, mal_id: int, *, links: str) -> None:
     with ctx.channel.typing():
         adding_source = True
         parse_from_forum = False
+        parse_external = False
         possible_command: str = links.strip().lower()
         if possible_command == "remove":
             adding_source = False
-        if possible_command.startswith("forum"):
+        elif possible_command.startswith("forum"):
             parse_from_forum = True
+        elif possible_command.startswith("external"):
+            parse_external = True
         logger.debug("{} source".format("Adding" if adding_source else "Removing"))
 
         valid_links = []
@@ -409,6 +413,14 @@ async def source(ctx: commands.Context, mal_id: int, *, links: str) -> None:
                     valid_links.append(matched_link)
                 except RuntimeError as re:
                     return await ctx.channel.send(str(re))
+            elif parse_external:
+                external_link: Optional[str] = await get_official_link(mal_id)
+                if external_link is None:
+                    return await ctx.channel.send(
+                        "Could not find an official link on MAL for that ID"
+                    )
+                await ctx.channel.send(f"Adding {external_link}...")
+                valid_links.append(external_link)
             else:
                 # if there are multiple links, check each
                 for link in links.split():
@@ -568,8 +580,8 @@ async def help(ctx):
         inline=False,
     )
     embed.add_field(
-        name=f"{mentionbot} source <mal_id> <links...|remove|forum match_link_regex>",
-        value=f"Adds a source to an embed in #feed. Requires either the link, the `remove` keyword. e.g. `{mentionbot} source 1 https://....` or `{mentionbot} source 14939 remove` or `{mentionbot} source 1 forum youtube|vimeo` to search the forum for a source link matching 'youtube' or 'vimeo'",
+        name=f"{mentionbot} source <mal_id> <links...|external|remove|forum match_link_regex>",
+        value=f"Adds a source to an embed in #feed. Requires either the link, the `remove` keyword. e.g. `{mentionbot} source 1 https://....`, `{mentionbot} source 1 remove`, `{mentionbot}` source 1 external to grab the link from the external links, or `{mentionbot} source 1 forum youtube|vimeo` to search the forum for a source link matching 'youtube' or 'vimeo'",
         inline=False,
     )
     embed.add_field(
