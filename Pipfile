@@ -18,3 +18,4 @@ backoff = "*"
 aiofiles = "*"
 bs4 = "*"
 logzero = "*"
+malexport = {git = "https://github.com/seanbreckenridge/malexport/"}

@@ -31,7 +31,7 @@ from .utils.embeds import (
     remove_source,
     get_source,
 )
-from .utils.user import download_users_list  # currently not used
+from .utils.user import download_users_list
 from .utils.forum import get_forum_links
 from .utils.external import get_official_link
 
@@ -487,21 +487,24 @@ async def refresh(ctx: commands.Context, mal_id: int) -> None:
 @client.command()
 @log
 async def check(ctx: commands.Context, mal_username: str, num: int) -> None:
-    # the request.get calls are synchronous - blocking, figure out a better way to implement this
     leftover_args = " ".join(ctx.message.content.strip().split()[4:])
     print_all = "all" in leftover_args.lower()
     print_not_completed = "not completed" in leftover_args.lower()
     message = await ctx.channel.send(
         "Downloading {}'s list (downloaded 0 anime entries...)".format(mal_username)
     )
-    parsed = {}
-    for entries in download_users_list(mal_username):
-        for e in entries:
-            parsed[e["mal_id"]] = e["watching_status"]
-        await message.edit(
-            content=f"Downloading {mal_username}'s list (downloaded {len(parsed)} anime entries...)"
-        )
-        await sleep(0.5)  # be nice to other async tasks
+    parsed: Dict[int, str] = {}
+    for resp in download_users_list(mal_username):
+        if "my_list_status" not in resp:
+            continue
+        parsed[int(resp["id"])] = str(resp["my_list_status"]["status"])
+        if len(parsed) > 0 and len(parsed) % 100 == 0:
+            await message.edit(
+                content=f"Downloading {mal_username}'s list (downloaded {len(parsed)} anime entries...)"
+            )
+    await message.edit(
+        content=f"Downloaded {mal_username}'s list (downloaded {len(parsed)} anime entries...)"
+    )
     found_entry = False  # mark True if we find an entry the user hasnt watched
     async for message in client.feed_channel.history(limit=num, oldest_first=False):
         try:
@@ -514,8 +517,8 @@ async def check(ctx: commands.Context, mal_username: str, num: int) -> None:
             assert mal_id_str, f"Could not extract url from {embed.url}"
             mal_id = int(mal_id_str)
             on_your_list = mal_id in parsed
-            on_your_ptw = mal_id in parsed and parsed[mal_id] == 6
-            on_your_completed = mal_id in parsed and parsed[mal_id] == 2
+            on_your_ptw = mal_id in parsed and parsed[mal_id] == "plan_to_watch"
+            on_your_completed = mal_id in parsed and parsed[mal_id] == "completed"
             if (not on_your_list) or (
                 on_your_ptw or (print_not_completed and not on_your_completed)
             ):
@@ -559,6 +562,8 @@ async def check(ctx: commands.Context, mal_username: str, num: int) -> None:
                 num
             )
         )
+
+    await ctx.channel.send("Done!")
 
 
 @client.command()
