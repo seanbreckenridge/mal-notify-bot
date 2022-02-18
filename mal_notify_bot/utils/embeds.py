@@ -4,6 +4,7 @@ import asyncio
 from typing import List
 
 import jikanpy
+from jikanpy.exceptions import JikanException, APIException
 import discord  # type: ignore[import]
 import backoff  # type: ignore[import]
 
@@ -17,7 +18,7 @@ j = jikanpy.AioJikan("http://localhost:8000/v3/")
 @log
 @backoff.on_exception(
     fibo_long,  # fibonacci sequence backoff
-    (jikanpy.exceptions.JikanException, jikanpy.exceptions.APIException),
+    (JikanException, APIException),
     max_tries=3,
 )
 async def get_data(
@@ -51,7 +52,7 @@ async def get_data(
     synopsis = resp.get("synopsis", "No Synopsis")
     if synopsis is not None:
         synopsis.replace("\r", "")
-        synopsis = re.sub("\n\s*\n", "\n", synopsis.strip()).strip()
+        synopsis = re.sub(r"\n\s*\n", "\n", synopsis.strip()).strip()
         if len(synopsis) > 400:
             synopsis = synopsis[:400].strip() + "..."
         if synopsis.strip() == "":
@@ -99,7 +100,7 @@ def add_to_embed(
 
 
 @log
-async def create_embed(mal_id: int, logger: logging.Logger) -> discord.Embed:
+async def create_embed(mal_id: int, logger: logging.Logger) -> Tuple[discord.Embed, bool]:
     title, image, synopsis, sfw, airdate, status = await get_data(
         mal_id, False, logger=logger
     )
@@ -142,7 +143,7 @@ async def refresh_embed(
 
 
 @log
-async def add_source(embed: discord.Embed, valid_links: List[str]) -> discord.Embed:
+async def add_source(embed: discord.Embed, valid_links: List[str]) -> Tuple[discord.Embed, bool]:
     new_embed = discord.Embed(
         title=embed.title, url=embed.url, color=discord.Color.dark_blue()
     )
@@ -177,5 +178,5 @@ async def remove_source(embed: discord.Embed) -> discord.Embed:
 def get_source(embed: discord.Embed) -> Optional[str]:
     for embed_proxy in embed.fields:
         if embed_proxy.name == "Source":
-            return embed_proxy.value
+            return str(embed_proxy.value)
     return None

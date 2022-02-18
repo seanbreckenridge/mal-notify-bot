@@ -3,6 +3,7 @@ from typing import Optional, Dict, Any
 
 import backoff
 import jikanpy
+from jikanpy.exceptions import JikanException, APIException
 
 from . import fibo_long, log
 
@@ -12,9 +13,9 @@ j = jikanpy.Jikan("http://localhost:8000/v3/")
 
 @backoff.on_exception(
     fibo_long,  # fibonacci sequence backoff
-    (jikanpy.exceptions.JikanException, jikanpy.exceptions.APIException),
+    (JikanException, APIException),
     max_tries=3,
-    on_backoff=lambda x: print("backing off"),
+    on_backoff=lambda _: print("backing off"),
 )
 @log
 async def get_official_link(mal_id: int) -> Optional[str]:
