@@ -40,4 +40,4 @@ This uses a local [jikan-rest](https://github.com/jikan-me/jikan-rest) instance 
 
 `python3 bot.py`
 
-This is run on `python 3.7`. You can use [pyenv](https://github.com/pyenv/pyenv) to install another version of python if needed.
+This is run on `python 3.10.2`. You can use [pyenv](https://github.com/pyenv/pyenv) to install another version of python if needed.
