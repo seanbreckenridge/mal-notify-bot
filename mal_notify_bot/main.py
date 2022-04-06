@@ -5,18 +5,19 @@ import json
 import traceback
 import pathlib
 
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Any, Tuple
 from asyncio import sleep
+from dataclasses import dataclass
 
 import yaml
 import requests
 import aiofiles
-import git  # type: ignore[import]
+from git.cmd import Git  # type: ignore[import]
 from logzero import logger  # type: ignore[import]
 
-from discord import errors, File, Message, Embed, TextChannel  # type: ignore[import]
-from discord.ext import commands  # type: ignore[import]
-from discord.utils import get  # type: ignore[import]
+from discord import errors, File, Message, Embed, TextChannel, Member
+from discord.ext import commands
+from discord.utils import get
 
 from .utils import (
     truncate,
@@ -43,8 +44,7 @@ token_file = os.path.join(root_dir, "token.yaml")
 old_db_file = os.path.join(root_dir, "old")
 assert os.path.exists(old_db_file)
 # arbitrary check to make sure the olddb isnt empty
-assert len(pathlib.Path(old_db_file).read_text()) > 1000
-
+assert len(pathlib.Path(old_db_file).read_text()) > 10000
 
 # file to export sources as a backup
 export_file = os.path.join(root_dir, "export.json")
@@ -52,9 +52,22 @@ export_file = os.path.join(root_dir, "export.json")
 # bot object
 client = commands.Bot(command_prefix=commands.when_mentioned, case_insensitive=False)
 client.remove_command("help")  # remove default help
-# amount of time to wait between checking for new entries
-client.period = 60 * 10
-client.export_period = 60 * 60 * 6  # once every 6 hours
+
+
+ADMIN_ROLE = "admin"
+TRUSTED_ROLE = "trusted"
+
+
+@dataclass
+class GlobalsType:
+    period: int = 60 * 5
+    export_period = 60 * 60 * 6  # once every 6 hours
+    feed_channel: Any = None
+    nsfw_feed_channel: Any = None
+    old_db: Any = None
+
+
+Globals = GlobalsType()
 
 
 class FileState:
@@ -93,7 +106,7 @@ class OldDatabase(FileState):
 @log
 async def update_git_repo():
     """Updates from the remote mal-id-cache"""
-    g = git.cmd.Git(mal_id_cache_dir)
+    g = Git(mal_id_cache_dir)
     g.pull()
     commit_id = g.log().splitlines()[0].split()[-1]
     logger.debug(f"{g.working_dir} is at commit hash {commit_id}")
@@ -108,27 +121,9 @@ async def read_json_cache():
     return list(map(str, contents["sfw"] + contents["nsfw"]))
 
 
-def is_admin_or_owner():
-    """Check that returns True if the user is the owner/admin on the server"""
-
-    async def predicate(ctx):
-        is_owner = await ctx.bot.is_owner(ctx.author)
-        is_admin = ctx.author.permissions_in(ctx.channel).administrator
-        return is_owner or is_admin
-
-    return commands.check(predicate)
-
-
-def has_privilege():
-    """Check that returns true if the user can use 'trusted' commands or is owner/admin"""
-
-    async def predicate(ctx):
-        is_owner = await ctx.bot.is_owner(ctx.author)
-        is_admin = ctx.author.permissions_in(ctx.channel).administrator
-        is_trusted = "trusted" in [role.name.lower() for role in ctx.author.roles]
-        return is_owner or is_admin or is_trusted
-
-    return commands.check(predicate)
+def roles_from_context(ctx: commands.Context) -> List[str]:
+    assert isinstance(ctx.author, Member)
+    return [role.name.lower() for role in ctx.author.roles]
 
 
 @client.event
@@ -141,7 +136,8 @@ async def on_ready():  # include so that on_ready event shows up in logs
 # which would ordinarily not trigger commands
 @client.event
 async def on_message(message):
-    message.content = re.sub("\s{2,}", " ", message.content)  # remove weird spaces
+    # remove weird spaces
+    message.content = re.sub(r"\s{2,}", " ", message.content)
     await client.process_commands(message)
 
 
@@ -156,10 +152,11 @@ async def search_feed_for_mal_id(
     async for message in channel.history(limit=limit, oldest_first=False):
         try:
             embed = message.embeds[0]
-            embed_id = extract_mal_id_from_url(embed.url)
-            if embed_id is not None and embed_id == mal_id:
-                logger.debug("Found message: {}".format(message))
-                return message
+            if embed.url is not None:
+                embed_id = extract_mal_id_from_url(embed.url)
+                if embed_id is not None and int(embed_id) == int(mal_id):
+                    logger.debug("Found message: {}".format(message))
+                    return message
         except Exception as e:
             logger.warning("Error while searching history: {}".format(str(e)))
             continue
@@ -174,6 +171,8 @@ async def _export_channel(channel: TextChannel) -> Dict[str, str]:
         except:
             continue
         else:
+            if embed.url is None:
+                continue
             embed_id: Optional[str] = extract_mal_id_from_url(embed.url)
             if embed_id is not None:
                 source: Optional[str] = get_source(embed)
@@ -190,29 +189,30 @@ async def run_export() -> None:
     saving any sources to a JSON file
     """
 
-    feed_results: Dict[str, str] = await _export_channel(client.feed_channel)
-    nsfw_feed_results: Dict[str, str] = await _export_channel(client.nsfw_feed_channel)
+    feed_results: Dict[str, str] = await _export_channel(Globals.feed_channel)
+    nsfw_feed_results: Dict[str, str] = await _export_channel(Globals.nsfw_feed_channel)
     feed_results.update(nsfw_feed_results)
     with open(export_file, "w") as f:
         f.write(json.dumps(feed_results, sort_keys=True, indent=4))
 
 
 @client.command()
-@has_privilege()
 @log
 async def export(ctx):
-    with ctx.channel.typing():
-        await run_export()
-        await ctx.channel.send(file=File(export_file))
+    if TRUSTED_ROLE not in roles_from_context(ctx):
+        await ctx.channel.send("Insufficient permissions")
+        return
+    await run_export()
+    await ctx.channel.send(file=File(export_file))
 
 
 async def export_loop():
     await client.wait_until_ready()
-    assert client.feed_channel is not None
-    assert client.nsfw_feed_channel is not None
+    assert Globals.feed_channel is not None
+    assert Globals.nsfw_feed_channel is not None
     while not client.is_closed():
         # save to JSON file
-        await sleep(client.export_period)
+        await sleep(Globals.export_period)
         await run_export()
 
 
@@ -225,52 +225,46 @@ async def print_loop() -> None:
     guilds = list(iter(client.guilds))
     if len(guilds) != 1:
         logger.critical("This bot should only be used on one server")
-        await client.logout()
         sys.exit(1)
     channels = guilds[0].channels
-    client.feed_channel = get(channels, name="feed")
-    client.nsfw_feed_channel = get(channels, name="nsfw-feed")
-    if client.feed_channel is None:
+    Globals.feed_channel = get(channels, name="feed")
+    Globals.nsfw_feed_channel = get(channels, name="nsfw-feed")
+    if Globals.feed_channel is None:
         logger.critical("Couldn't find the 'feed' channel")
-    if client.nsfw_feed_channel is None:
+    if Globals.nsfw_feed_channel is None:
         logger.critical("Couldn't find the 'nsfw-feed' channel")
-    client.old_db = OldDatabase(filepath=old_db_file)
+    Globals.old_db = OldDatabase(filepath=old_db_file)
     client.loop.create_task(export_loop())
     while not client.is_closed():
         # if there are new entries, print them
         await print_new_embeds()
-        logger.debug(f"Sleeping for {client.period}")
-        await sleep(client.period)
+        logger.debug(f"Sleeping for {Globals.period}")
+        await sleep(Globals.period)
 
 
 @client.command()
-@has_privilege()
 @log
 async def add_new(ctx):
-    async with ctx.channel.typing():
-        new_embeds = await create_new_embeds(ctx)
-        if not new_embeds:
-            return await ctx.channel.send("No new entries found.")
-        else:
-            entry_count = len(new_embeds)
-            await ctx.channel.send(
-                "Found {} new entr{}.".format(
-                    entry_count, "y" if entry_count == 1 else "ies"
-                )
-            )
-            return await print_new_embeds(new_embeds=new_embeds)
+    if TRUSTED_ROLE not in roles_from_context(ctx):
+        await ctx.channel.send("Insufficient permissions")
+        return
+    await print_new_embeds()
+    await ctx.channel.send("Done!")
+    return
 
 
 @client.command()
-@is_admin_or_owner()
 @log
 async def restart(ctx):
+    if ADMIN_ROLE not in roles_from_context(ctx):
+        await ctx.channel.send("Insufficient permissions")
+        return
     await ctx.channel.send("Restarting...")
     sys.exit(0)
 
 
 @log
-async def create_new_embeds(ctx=None):
+async def create_new_embeds(ctx=None) -> List[Tuple[Embed, bool]]:
     """
     git pulls, reads the json cache, and returns new embeds if they exist
     this *is* blocking, but temporarily blocking seems better than managing multple processes
@@ -278,210 +272,216 @@ async def create_new_embeds(ctx=None):
     await update_git_repo()
     ids = await read_json_cache()
     new_ids = []
-    new_embeds = []
-    if not client.old_db.file_exists():
-        logger.info(f"{client.old_db.filepath} didn't exist, creating...")
-        with open(client.old_db.filepath):
-            await client.old_db.dump(ids)
+    if not Globals.old_db.file_exists():
+        logger.info(f"{Globals.old_db.filepath} didn't exist, creating...")
+        with open(Globals.old_db.filepath):
+            await Globals.old_db.dump(ids)
     else:
-        old_ids = await client.old_db.read()
+        old_ids = await Globals.old_db.read()
         new_ids = sorted(list(set(ids) - set(old_ids)))
         logger.debug(f"new ids: {truncate(new_ids, 200)}")
         logger.debug(f"({len(new_ids)} new ids)")
 
-    # couldnt have possibly be 1000 entries approved since we last checked
+    # couldnt have possibly be 10000 entries approved since we last checked
     # this means there was an error writing to old_db
-    if len(new_ids) > 1000:
-        error_message = f"There were {len(new_ids)} new entries, there must have been an error writing to the old_db file at '{client.old_db.filepath}'"
+    if len(new_ids) > 10000:
+        error_message = f"There were {len(new_ids)} new entries, there must have been an error writing to the old_db file at '{Globals.old_db.filepath}'"
         logger.warning(error_message)
         if ctx:
             await ctx.channel.send(error_message)
         return []
 
+    new_embeds = []
     for new_id in new_ids:
         await sleep(0)  # allow other items in the asyncio loop to run
-        new_embeds.append(await create_embed(int(new_id), logger))
+        new_embed = await create_embed(int(new_id), logger)
+        new_embeds.append(new_embed)
     return new_embeds
 
 
 @log
-async def print_new_embeds(new_embeds=None):
-    if new_embeds is None:
-        new_embeds = await create_new_embeds()
-    if new_embeds:
-        old_ids = await client.old_db.read()
-        # prevent broken old files from printing a bunch of messages
-        assert len(old_ids) > 1000
-        for embed, sfw in new_embeds:
-            print_to_channel = client.feed_channel if sfw else client.nsfw_feed_channel
-            new_mal_id = extract_mal_id_from_url(embed.url)
-            # check if that message already exists in the channel
-            previous_message = await search_feed_for_mal_id(
-                mal_id=new_mal_id, channel=print_to_channel, limit=1000
+async def print_new_embeds():
+    old_ids = await Globals.old_db.read()
+    # prevent broken old files from printing a bunch of messages
+    assert len(old_ids) > 10000
+    for embed, sfw in await create_new_embeds():
+        print_to_channel = Globals.feed_channel if sfw else Globals.nsfw_feed_channel
+        assert embed.url is not None, f"{embed.to_dict()}"
+        new_mal_id = extract_mal_id_from_url(embed.url)
+        assert new_mal_id is not None
+        # check if that message already exists in the channel
+        previous_message = await search_feed_for_mal_id(
+            mal_id=int(new_mal_id), channel=print_to_channel, limit=1000
+        )
+        if previous_message is not None:
+            logger.debug(
+                f"While attempting to print new id {new_mal_id}, found previously printed message: {previous_message}"
             )
-            if previous_message is not None:
-                logger.debug(
-                    f"While attempting to print new id {new_mal_id}, found previously printed message: {previous_message}"
-                )
-            else:
-                logger.debug(
-                    f"Couldnt find any message with id {new_mal_id}, printing new message"
-                )
-            if (
-                new_mal_id not in old_ids and previous_message is None
-            ):  # make sure we're not printing entries twice
-                logger.debug(
-                    "Printing {} to {}".format(
-                        new_mal_id, "#feed" if sfw else "#nsfw-feed"
-                    )
-                )
-                await print_to_channel.send(embed=embed)
-            await sleep(2)
-            # check that we actually printed the embed
-            printed_message = await search_feed_for_mal_id(
-                mal_id=new_mal_id, channel=print_to_channel, limit=1000
+        else:
+            logger.debug(
+                f"Couldnt find any message with id {new_mal_id}, printing new message"
             )
-            if printed_message:
-                logger.debug(
-                    f"Found printed message in channel, adding {new_mal_id} to old ids"
-                )
-                old_ids.add(new_mal_id)
-                logger.debug("Attempting to publish message...")
-                try:
-                    await printed_message.publish()
-                except Exception as publish_err:
-                    logger.warning(f"Couldn't publish message {publish_err}")
-            else:
-                logger.warning(
-                    f"Couldnt find printed message for id {new_mal_id} in channel"
-                )
-                sys.exit(1)
-        await client.old_db.dump(old_ids)
+        if (
+            new_mal_id not in old_ids and previous_message is None
+        ):  # make sure we're not printing entries twice
+            logger.debug(
+                "Printing {} to {}".format(new_mal_id, "#feed" if sfw else "#nsfw-feed")
+            )
+            await print_to_channel.send(embed=embed)
+        await sleep(2)
+        # check that we actually printed the embed
+        printed_message = await search_feed_for_mal_id(
+            mal_id=int(new_mal_id), channel=print_to_channel, limit=1000
+        )
+        if printed_message:
+            logger.debug(
+                f"Found printed message in channel, adding {new_mal_id} to old ids"
+            )
+            old_ids.add(new_mal_id)
+            logger.debug("Attempting to publish message...")
+            try:
+                await printed_message.publish()
+            except Exception as publish_err:
+                logger.warning(f"Couldn't publish message {publish_err}")
+        else:
+            logger.warning(
+                f"Couldnt find printed message for id {new_mal_id} in channel"
+            )
+            sys.exit(1)
+    await Globals.old_db.dump(old_ids)
 
 
 @client.command()
-@is_admin_or_owner()
 @log
 async def test_log(ctx):
+    if ADMIN_ROLE not in roles_from_context(ctx):
+        await ctx.channel.send("Insufficient permissions")
+        return
     message = "test message. beep boop"
-    await client.feed_channel.send(message)
-    await client.nsfw_feed_channel.send(message)
+    await Globals.feed_channel.send(message)
+    await Globals.nsfw_feed_channel.send(message)
 
 
 @client.command()
-@is_admin_or_owner()
 @log
 async def index(ctx: commands.Context, pages: int) -> None:
+    if ADMIN_ROLE not in roles_from_context(ctx):
+        await ctx.channel.send("Insufficient permissions")
+        return
     # communicates with the https://github.com/Hiyori-API/checker_mal
     # instance to tell it to index more pages
     resp = requests.get(f"http://localhost:4001/api/pages?type=anime&pages={pages}")
     resp.raise_for_status()
-    await ctx.channel.send(f"Successfully submitted request to index {pages} anime pages")
+    await ctx.channel.send(
+        f"Successfully submitted request to index {pages} anime pages"
+    )
 
 
 @client.command()
-@has_privilege()
 @log
 async def source(ctx: commands.Context, mal_id: int, *, links: str) -> None:
+    if TRUSTED_ROLE not in roles_from_context(ctx):
+        await ctx.channel.send("Insufficient permissions")
+        return
+    adding_source = True
+    parse_from_forum = False
+    parse_external = False
+    possible_command: str = links.strip().lower()
+    if possible_command == "remove":
+        adding_source = False
+    elif possible_command.startswith("forum"):
+        parse_from_forum = True
+    elif possible_command.startswith("external"):
+        parse_external = True
+    logger.debug("{} source".format("Adding" if adding_source else "Removing"))
 
-    with ctx.channel.typing():
-        adding_source = True
-        parse_from_forum = False
-        parse_external = False
-        possible_command: str = links.strip().lower()
-        if possible_command == "remove":
-            adding_source = False
-        elif possible_command.startswith("forum"):
-            parse_from_forum = True
-        elif possible_command.startswith("external"):
-            parse_external = True
-        logger.debug("{} source".format("Adding" if adding_source else "Removing"))
+    valid_links = []
+    if adding_source:
+        if parse_from_forum:
+            match_string = possible_command.split(" ", 1)[-1].strip()
+            if len(match_string) == 0:
+                await ctx.channel.send(
+                    "Provide a link to match. e.g. 'forum youtube' or 'forum vimeo'"
+                )
+                return
+            try:
+                matched_link: str = await get_forum_links(mal_id, match_string, ctx=ctx)
+                await ctx.channel.send("Matched <{}>".format(matched_link))
+                valid_links.append(matched_link)
+            except RuntimeError as re:
+                await ctx.channel.send(str(re))
+                return
+        elif parse_external:
+            external_link: Optional[str] = await get_official_link(mal_id)
+            if external_link is None:
+                await ctx.channel.send(
+                    "Could not find an official link on MAL for that ID"
+                )
+                return
+            await ctx.channel.send(f"Adding {external_link}...")
+            valid_links.append(external_link)
+        else:
+            # if there are multiple links, check each
+            for link in links.split():
+                # remove supression from link, if it exists
+                link = remove_discord_link_supression(link)
+                valid_links.append(link)
 
-        valid_links = []
-        if adding_source:
-            if parse_from_forum:
-                match_string = possible_command.split(" ", 1)[-1].strip()
-                if len(match_string) == 0:
-                    return await ctx.channel.send(
-                        "Provide a link to match. e.g. 'forum youtube' or 'forum vimeo'"
-                    )
-                try:
-                    matched_link: str = await get_forum_links(
-                        mal_id, match_string, ctx=ctx
-                    )
-                    await ctx.channel.send("Matched <{}>".format(matched_link))
-                    valid_links.append(matched_link)
-                except RuntimeError as re:
-                    return await ctx.channel.send(str(re))
-            elif parse_external:
-                external_link: Optional[str] = await get_official_link(mal_id)
-                if external_link is None:
-                    return await ctx.channel.send(
-                        "Could not find an official link on MAL for that ID"
-                    )
-                await ctx.channel.send(f"Adding {external_link}...")
-                valid_links.append(external_link)
-            else:
-                # if there are multiple links, check each
-                for link in links.split():
-                    # remove supression from link, if it exists
-                    link = remove_discord_link_supression(link)
-                    valid_links.append(link)
-
-        # get logs from feed
-        message = await search_feed_for_mal_id(
-            str(mal_id), client.feed_channel
+    # get logs from feed
+    message = await search_feed_for_mal_id(int(mal_id), Globals.feed_channel)
+    if not message:
+        await ctx.channel.send(
+            "Could not find a message that contains the MAL id {} in {}".format(
+                mal_id, Globals.feed_channel.mention
+            )
         )
-        if not message:
-            return await ctx.channel.send(
-                "Could not find a message that contains the MAL id {} in {}".format(
-                    mal_id, client.feed_channel.mention
+        return
+    else:
+        embed = message.embeds[0]
+        if adding_source:
+            new_embed, is_new_source = await add_source(embed, valid_links)
+            await message.edit(embed=new_embed)
+            await ctx.channel.send(
+                "{} source for '{}' successfully.".format(
+                    "Added" if is_new_source else "Replaced", embed.title
                 )
             )
+            return
         else:
-            embed = message.embeds[0]
-            if adding_source:
-                new_embed, is_new_source = await add_source(embed, valid_links)
-                await message.edit(embed=new_embed)
-                return await ctx.channel.send(
-                    "{} source for '{}' successfully.".format(
-                        "Added" if is_new_source else "Replaced", embed.title
-                    )
-                )
-            else:
-                new_embed = await remove_source(embed)
-                await message.edit(embed=new_embed)
-                return await ctx.channel.send(
-                    "Removed source for '{}' successfully.".format(embed.title)
-                )
+            new_embed = await remove_source(embed)
+            await message.edit(embed=new_embed)
+            await ctx.channel.send(
+                "Removed source for '{}' successfully.".format(embed.title)
+            )
+            return
 
 
 @client.command()
-@has_privilege()
 @log
 async def refresh(ctx: commands.Context, mal_id: int) -> None:
-    with ctx.channel.typing():
-        remove_image = "remove image" in ctx.message.content.lower()
+    remove_image = "remove image" in ctx.message.content.lower()
+    message = await search_feed_for_mal_id(
+        int(mal_id), Globals.feed_channel, limit=999999
+    )
+    if not message:  # search nsfw channel
         message = await search_feed_for_mal_id(
-            str(mal_id), client.feed_channel, limit=999999
+            int(mal_id), Globals.nsfw_feed_channel, limit=999999
         )
-        if not message:  # search nsfw channel
-            message = await search_feed_for_mal_id(
-                str(mal_id), client.nsfw_feed_channel, limit=999999
+    if message:
+        embed = message.embeds[0]
+        new_embed = await refresh_embed(embed, mal_id, remove_image, logger)
+        await message.edit(embed=new_embed)
+        await ctx.channel.send(
+            "{} for '{}' successfully.".format(
+                "Removed image" if remove_image else "Updated fields", embed.title
             )
-        if message:
-            embed = message.embeds[0]
-            new_embed = await refresh_embed(embed, mal_id, remove_image, logger)
-            await message.edit(embed=new_embed)
-            return await ctx.channel.send(
-                "{} for '{}' successfully.".format(
-                    "Removed image" if remove_image else "Updated fields", embed.title
-                )
-            )
-        else:
-            return await ctx.channel.send(
-                "Could not find a message that contains the MAL id {}".format(mal_id)
-            )
+        )
+        return
+    else:
+        await ctx.channel.send(
+            "Could not find a message that contains the MAL id {}".format(mal_id)
+        )
+        return
 
 
 @client.command()
@@ -506,7 +506,7 @@ async def check(ctx: commands.Context, mal_username: str, num: int) -> None:
         content=f"Downloaded {mal_username}'s list (downloaded {len(parsed)} anime entries...)"
     )
     found_entry = False  # mark True if we find an entry the user hasnt watched
-    async for message in client.feed_channel.history(limit=num, oldest_first=False):
+    async for message in Globals.feed_channel.history(limit=num, oldest_first=False):
         try:
             embed = message.embeds[0]
         except Exception:
@@ -601,7 +601,11 @@ async def help(ctx):
     )
     embed.add_field(name="'admin' commands", value="\u200b", inline=False)
     embed.add_field(name=f"{mentionbot} restart", value="Restart the bot", inline=False)
-    embed.add_field(name=f"{mentionbot} index <pages>", value="Communicate with the process that indexes MAL, asking it to search <pages> of recently approved MAL entries for newly approved items", inline=False)
+    embed.add_field(
+        name=f"{mentionbot} index <pages>",
+        value="Communicate with the process that indexes MAL, asking it to search <pages> of recently approved MAL entries for newly approved items",
+        inline=False,
+    )
     await ctx.channel.send(embed=embed)
 
 
@@ -622,11 +626,16 @@ async def on_command_error(ctx, error):
         return
 
     if isinstance(error, commands.CommandNotFound):
-        await ctx.channel.send(
-            "Could not find the command `{}`. Use `@notify help` to see a list of commands.".format(
-                command_name
+        if command_name is None:
+            await ctx.channel.send(
+                "Didn't provide a known command. Use `@notify help` to see a list of commands"
             )
-        )
+        else:
+            await ctx.channel.send(
+                "Could not find the command `{}`. Use `@notify help` to see a list of commands.".format(
+                    command_name
+                )
+            )
     elif isinstance(error, commands.CheckFailure):
         await ctx.channel.send(
             "You don't have sufficient permissions to run this command."
@@ -658,7 +667,7 @@ async def on_command_error(ctx, error):
     ):
         await ctx.channel.send(
             "Provide your MAL username and then the number of entries in {} you want to check".format(
-                client.feed_channel.mention
+                Globals.feed_channel.mention
             )
         )
     elif isinstance(error, commands.BadArgument) and command_name == "check":
@@ -694,9 +703,13 @@ async def on_command_error(ctx, error):
         logger.exception(error, exc_info=True)
 
 
+@client.event
+async def setup_hook() -> None:
+    client.loop.create_task(print_loop())  # waits until bot is ready
+
+
 def main():
     # Token is stored in token.yaml, with the key 'token'
     with open(token_file, "r") as t:
         token = yaml.load(t, Loader=yaml.FullLoader)["token"]
-    client.loop.create_task(print_loop())  # waits until bot is ready
-    client.run(token, bot=True, reconnect=True)
+    client.run(token, reconnect=True)
