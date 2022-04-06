@@ -9,10 +9,10 @@ mypy = "*"
 typing-extensions = "*"
 
 [packages]
-pyyaml = ">=5.4"
-aiohttp = ">=3.7.4"
+pyyaml = "*"
+aiohttp = "==3.7.4.post0"
 requests = "*"
-discord-py = ">=1.6.0"
+discord-py = {git = "https://github.com/Rapptz/discord.py"}
 gitpython = "*"
 jikanpy = ">=4.1.0"
 backoff = "*"
