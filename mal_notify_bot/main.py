@@ -212,8 +212,8 @@ async def export_loop():
     assert Globals.nsfw_feed_channel is not None
     while not client.is_closed():
         # save to JSON file
-        await sleep(Globals.export_period)
         await run_export()
+        await sleep(Globals.export_period)
 
 
 # run in event loop
@@ -439,6 +439,7 @@ async def source(ctx: commands.Context, mal_id: int, *, links: str) -> None:
     else:
         embed = message.embeds[0]
         if adding_source:
+            logger.debug(f"Editing {message} to include {valid_links}")
             new_embed, is_new_source = await add_source(embed, valid_links)
             await message.edit(embed=new_embed)
             await ctx.channel.send(
@@ -484,9 +485,15 @@ async def refresh(ctx: commands.Context, mal_id: int) -> None:
         return
 
 
+CHECK_DISABLED = False
+
+
 @client.command()
 @log
 async def check(ctx: commands.Context, mal_username: str, num: int) -> None:
+    if CHECK_DISABLED:
+        await ctx.channel.send("check is currently disabled")
+        return
     leftover_args = " ".join(ctx.message.content.strip().split()[4:])
     print_all = "all" in leftover_args.lower()
     print_not_completed = "not completed" in leftover_args.lower()
