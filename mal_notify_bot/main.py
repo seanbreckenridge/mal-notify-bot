@@ -15,7 +15,7 @@ import aiofiles
 from git.cmd import Git  # type: ignore[import]
 from logzero import logger  # type: ignore[import]
 
-from discord import errors, File, Message, Embed, TextChannel, Member
+from discord import errors, File, Message, Embed, TextChannel, Member, Intents
 from discord.ext import commands
 from discord.utils import get
 
@@ -48,7 +48,7 @@ assert len(pathlib.Path(old_db_file).read_text()) > 10000
 export_file = os.path.join(root_dir, "export.json")
 
 # bot object
-client = commands.Bot(command_prefix=commands.when_mentioned, case_insensitive=False)
+client = commands.Bot(command_prefix=commands.when_mentioned, case_insensitive=False, intents=Intents.default())
 client.remove_command("help")  # remove default help
 
 
