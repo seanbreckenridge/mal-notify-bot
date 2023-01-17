@@ -11,7 +11,7 @@ typing-extensions = "*"
 [packages]
 pyyaml = "*"
 requests = "*"
-discord-py = {git = "https://github.com/Rapptz/discord.py"}
+discord-py = ">=2.1.0"
 gitpython = "*"
 backoff = "*"
 aiofiles = "*"
