@@ -10,13 +10,13 @@ typing-extensions = "*"
 
 [packages]
 pyyaml = "*"
-aiohttp = "==3.7.4.post0"
 requests = "*"
 discord-py = {git = "https://github.com/Rapptz/discord.py"}
 gitpython = "*"
-jikanpy = ">=4.1.0"
 backoff = "*"
 aiofiles = "*"
-bs4 = "*"
 logzero = "*"
 malexport = {git = "https://github.com/seanbreckenridge/malexport/"}
+
+[scripts]
+bot = "python3 bot.py"

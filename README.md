@@ -34,8 +34,6 @@ put your bots token in `token.yaml` with contents like:
 
 `token: !!str EU*#3eiSzEr7i4L36FaTlrV0*RtuGOBVNrcteyrtt$GPAwNtkJKQg*dweSLy`
 
-This uses a local [jikan-rest](https://github.com/jikan-me/jikan-rest) instance hosted on port 8000, my docker setup [here](https://github.com/seanbreckenridge/docker-jikan)
-
 #### Run:
 
 `python3 bot.py`

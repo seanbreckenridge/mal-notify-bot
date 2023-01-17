@@ -3,33 +3,53 @@ import logging
 import asyncio
 from typing import List
 
-import jikanpy
-from jikanpy.exceptions import JikanException, APIException
 import discord  # type: ignore[import]
-import backoff  # type: ignore[import]
 
 from typing import Optional, Dict, Any, Tuple
 
-from . import fibo_long, log
+from . import log
 
-j = jikanpy.AioJikan("http://localhost:8000/v3/")
+from .user import session
+
+assert session is not None
+
+
+BASE_ANIME_URL = "https://api.myanimelist.net/v2/anime/{}?nsfw=true"
+
+ANIME_FIELDS = "fields=id,title,main_picture,alternative_titles,start_date,end_date,synopsis,mean,rank,popularity,num_list_users,num_scoring_users,nsfw,created_at,updated_at,media_type,status,genres,num_episodes,start_season,broadcast,source,average_episode_duration,rating,pictures,background,related_anime,related_manga,recommendations,studios,statistics"
+
+
+def fetch_anime_details(anime_id: int) -> Dict[str, Any]:
+    """Fetches anime details from MAL"""
+    api_url = BASE_ANIME_URL.format(anime_id) + "&" + ANIME_FIELDS
+    assert session is not None
+    return session.safe_json_request(api_url)
+
+
+def _get_mal_image(data: dict) -> Optional[str]:
+    """Gets the image from MAL"""
+    if pics := data.get("main_picture"):
+        if medium := pics.get("medium"):
+            return medium
+        if large := pics.get("large"):
+            return large
+    return None
+
+
+def unslugify(slug: str) -> str:
+    return " ".join([w.capitalize() for w in slug.split("_")])
 
 
 @log
-@backoff.on_exception(
-    fibo_long,  # fibonacci sequence backoff
-    (JikanException, APIException),
-    max_tries=3,
-)
 async def get_data(
-    mal_id: int, ignore_image: bool, **kwargs: logging.Logger
+    mal_id: int, ignore_image: bool = False, **kwargs: logging.Logger
 ) -> Tuple[str, Optional[str], Optional[str], bool, Optional[str], str]:
 
     logger: Optional[logging.Logger] = kwargs.get("logger", None)
 
     if logger:
         logger.debug("Sleeping before MAL request...")
-    await asyncio.sleep(10)
+    await asyncio.sleep(1)
 
     # return values
     name: str
@@ -39,10 +59,10 @@ async def get_data(
     status: Optional[str] = None
     sfw: bool
 
-    resp: Dict[str, Any] = await j.anime(mal_id)
+    resp: Dict[str, Any] = fetch_anime_details(mal_id)
     name = str(resp["title"])
     if not ignore_image:
-        image = resp["image_url"]
+        image = _get_mal_image(resp)
     # no image, default 'MAL' icon
     if image is not None and image.startswith(
         "https://myanimelist.cdn-dena.com/img/sp/icon/"
@@ -57,9 +77,9 @@ async def get_data(
             synopsis = synopsis[:400].strip() + "..."
         if synopsis.strip() == "":
             synopsis = "No Synopsis"
-    status = str(resp["status"])
-    airdate = resp["aired"].get("string", None)
-    sfw = 12 not in [g["mal_id"] for g in resp["genres"]]
+    status = str(unslugify(resp["status"]))
+    airdate = resp["start_date"]
+    sfw = "Hentai" not in [g["name"] for g in resp["genres"]]
     return name, image, synopsis, sfw, airdate, status
 
 
@@ -100,7 +120,9 @@ def add_to_embed(
 
 
 @log
-async def create_embed(mal_id: int, logger: logging.Logger) -> Tuple[discord.Embed, bool]:
+async def create_embed(
+    mal_id: int, logger: logging.Logger
+) -> Tuple[discord.Embed, bool]:
     title, image, synopsis, sfw, airdate, status = await get_data(
         mal_id, False, logger=logger
     )
@@ -143,7 +165,9 @@ async def refresh_embed(
 
 
 @log
-async def add_source(embed: discord.Embed, valid_links: List[str]) -> Tuple[discord.Embed, bool]:
+async def add_source(
+    embed: discord.Embed, valid_links: List[str]
+) -> Tuple[discord.Embed, bool]:
     new_embed = discord.Embed(
         title=embed.title, url=embed.url, color=discord.Color.dark_blue()
     )
