@@ -77,9 +77,9 @@ async def get_data(
             synopsis = synopsis[:400].strip() + "..."
         if synopsis.strip() == "":
             synopsis = "No Synopsis"
-    status = str(unslugify(resp["status"]))
-    airdate = resp["start_date"]
-    sfw = "Hentai" not in [g["name"] for g in resp["genres"]]
+    status = str(unslugify(resp.get("status", "Unknown")))
+    airdate = resp.get("start_date", "No Air Date")
+    sfw = "Hentai" not in [g.get("name") for g in resp.get("genres", [])]
     return name, image, synopsis, sfw, airdate, status
 
 
