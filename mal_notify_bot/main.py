@@ -87,13 +87,11 @@ class OldDatabase(FileState):
     def __init__(self, *, filepath):
         super().__init__(filepath)
 
-    @log
     async def read(self):
         async with aiofiles.open(self.filepath, mode="r") as old_f:
             contents = await old_f.read()
             return set(contents.splitlines())
 
-    @log
     async def dump(self, contents):
         contents = sorted(list(contents), key=int)
         async with aiofiles.open(self.filepath, mode="w") as old_f:
