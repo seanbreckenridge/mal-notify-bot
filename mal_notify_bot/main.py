@@ -48,7 +48,11 @@ assert len(pathlib.Path(old_db_file).read_text()) > 10000
 export_file = os.path.join(root_dir, "export.json")
 
 # bot object
-client = commands.Bot(command_prefix=commands.when_mentioned, case_insensitive=False, intents=Intents.default())
+client = commands.Bot(
+    command_prefix=commands.when_mentioned,
+    case_insensitive=False,
+    intents=Intents.default(),
+)
 client.remove_command("help")  # remove default help
 
 
@@ -584,7 +588,6 @@ async def help(ctx):
 
 @client.event
 async def on_command_error(ctx, error):
-
     command_name = None
     if ctx.command:
         command_name = ctx.command.name

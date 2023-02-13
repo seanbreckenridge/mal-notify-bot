@@ -44,7 +44,6 @@ def unslugify(slug: str) -> str:
 async def get_data(
     mal_id: int, ignore_image: bool = False, **kwargs: logging.Logger
 ) -> Tuple[str, Optional[str], Optional[str], bool, Optional[str], str]:
-
     logger: Optional[logging.Logger] = kwargs.get("logger", None)
 
     if logger:
