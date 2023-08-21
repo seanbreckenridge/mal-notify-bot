@@ -16,6 +16,7 @@ def first_page(username: str) -> str:
 
 
 def download_users_list(username: str) -> Iterator[Dict[str, Any]]:
+    assert session is not None
     for resp in session.paginate_all_data(first_page(username)):
         for entry in resp:
             yield entry["node"]

@@ -10,10 +10,11 @@ from typing import Dict, Optional, List, Any, Tuple
 from asyncio import sleep
 from dataclasses import dataclass
 
+import aiohttp
 import yaml
 import requests
 import httpx
-import aiofiles
+import aiofiles  # type: ignore[import]
 from git.cmd import Git  # type: ignore[import]
 from logzero import logger  # type: ignore[import]
 
@@ -266,7 +267,7 @@ async def restart(ctx):
 
 
 @log
-async def create_new_embeds(ctx=None) -> List[Tuple[Embed, bool]]:
+async def create_new_embeds(ctx: Optional[commands.Context]=None) -> List[Tuple[Embed, bool]]:
     """
     git pulls, reads the json cache, and returns new embeds if they exist
     this *is* blocking, but temporarily blocking seems better than managing multple processes
@@ -435,50 +436,55 @@ dbsentinel_base_url = "http://localhost:5200"
 @client.command()
 @log
 async def refresh(ctx: commands.Context, mal_id: int) -> None:
-    remove_image = "remove image" in ctx.message.content.lower()
-    message = await search_feed_for_mal_id(
-        int(mal_id), Globals.feed_channel, limit=999999
-    )
-    if not message:  # search nsfw channel
+    async def _update_embed() -> None:
+        remove_image = "remove image" in ctx.message.content.lower()
         message = await search_feed_for_mal_id(
-            int(mal_id), Globals.nsfw_feed_channel, limit=999999
+            int(mal_id), Globals.feed_channel, limit=999999
         )
-    if message:
-        embed = message.embeds[0]
-        new_embed = await refresh_embed(embed, mal_id, remove_image, logger)
-        await message.edit(embed=new_embed)
-        await ctx.channel.send(
-            "{} for '{}' successfully.".format(
-                "Removed image" if remove_image else "Updated fields", embed.title
+        if not message:  # search nsfw channel
+            message = await search_feed_for_mal_id(
+                int(mal_id), Globals.nsfw_feed_channel, limit=999999
             )
-        )
-    else:
-        await ctx.channel.send(
-            "Could not find a message that contains the MAL id {}".format(mal_id)
-        )
-    # send a refresh request to the dbsentinel instance as well, to update archived data
-    await asyncio.sleep(2)
-    logger.debug("Sending refresh request to dbsentinel")
-    if requests.get(f"{dbsentinel_base_url}/ping").status_code == 200:
-        logger.debug("dbsentinel is online, sending refresh request")
-        resp = requests.get(
-            f"{dbsentinel_base_url}/tasks/refresh_entry?entry_type=anime&entry_id={mal_id}"
-        )
-        if resp.status_code == 200:
-            logger.debug("Successfully refreshed data on dbsentinel")
-            await ctx.channel.send(f"Successfully refreshed data on dbsentinel")
+        if message:
+            embed = message.embeds[0]
+            new_embed = await refresh_embed(embed, mal_id, remove_image, logger)
+            await message.edit(embed=new_embed)
+            await ctx.channel.send(
+                "{} for '{}' successfully.".format(
+                    "Removed image" if remove_image else "Updated fields", embed.title
+                )
+            )
         else:
-            logger.warning(
-                f"Failed to refresh data on dbsentinel: {resp.text} {resp.text}"
+            await ctx.channel.send(
+                "Could not find a message that contains the MAL id {}".format(mal_id)
             )
-            error = str(resp.status_code)
-            try:
-                error = resp.json()["error"]
-            except:
-                pass
-            await ctx.channel.send(f"Failed to refresh data on dbsentinel: {error}")
-    else:
-        logger.warning("dbsentinel is offline, skipping refresh request")
+
+    async def _dbsentinel_update() -> None:
+        async with aiohttp.ClientSession() as async_client:
+            if (await async_client.get(f"{dbsentinel_base_url}/ping")).status == 200:
+                logger.debug(f"dbsentinel is online, sending refresh request for {mal_id}")
+                resp = await async_client.get(
+                    f"{dbsentinel_base_url}/tasks/refresh_entry?entry_type=anime&entry_id={mal_id}"
+                )
+                if resp.status == 200:
+                    logger.debug(f"Successfully refreshed data on {mal_id} on dbsentinel")
+                    await ctx.channel.send(f"Successfully refreshed data for {mal_id} on dbsentinel: <https://sean.fish/dbsentinel/anime/{mal_id}>")
+                else:
+                    logger.warning(
+                        f"Failed to refresh data for {mal_id} on dbsentinel: {resp.text} {resp.text}"
+                    )
+                    error = str(resp.status)
+                    try:
+                        error = (await resp.json())["error"]
+                    except:
+                        pass
+                    await ctx.channel.send(f"Failed to refresh data for {mal_id} on dbsentinel: {error}")
+            else:
+                logger.warning(f"dbsentinel is offline, skipping refresh request for {mal_id}")
+                await ctx.channel.send(f"dbsentinel is offline, skipping refresh request for {mal_id}")
+
+    # run both refreshes in parallel
+    await asyncio.gather(_update_embed(), _dbsentinel_update())
 
 
 CHECK_DISABLED = False
@@ -516,6 +522,7 @@ async def check(ctx: commands.Context, mal_username: str, num: int) -> None:
             continue
         source_exists = "Source" in [f.name for f in embed.fields]
         if source_exists or print_all:
+            assert embed.url, f"Could not find url in {embed}"
             mal_id_str = extract_mal_id_from_url(embed.url)
             assert mal_id_str, f"Could not extract url from {embed.url}"
             mal_id = int(mal_id_str)
@@ -531,7 +538,7 @@ async def check(ctx: commands.Context, mal_username: str, num: int) -> None:
                         [
                             "<{}>".format(url)
                             for url in [
-                                f.value for f in embed.fields if f.name == "Source"
+                                f.value for f in embed.fields if f.name == "Source" and f.value
                             ][0].split()
                         ]
                     )
