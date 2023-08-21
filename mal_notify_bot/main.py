@@ -427,6 +427,9 @@ async def source(ctx: commands.Context, mal_id: int, *, links: str) -> None:
             return
 
 
+dbsentinel_base_url = "http://localhost:5200"
+
+
 @client.command()
 @log
 async def refresh(ctx: commands.Context, mal_id: int) -> None:
@@ -447,12 +450,33 @@ async def refresh(ctx: commands.Context, mal_id: int) -> None:
                 "Removed image" if remove_image else "Updated fields", embed.title
             )
         )
-        return
     else:
         await ctx.channel.send(
             "Could not find a message that contains the MAL id {}".format(mal_id)
         )
-        return
+    # send a refresh request to the dbsentinel instance as well, to update archived data
+    await asyncio.sleep(2)
+    logger.debug("Sending refresh request to dbsentinel")
+    if requests.get(f"{dbsentinel_base_url}/ping").status_code == 200:
+        logger.debug("dbsentinel is online, sending refresh request")
+        resp = requests.get(
+            f"{dbsentinel_base_url}/tasks/refresh_entry?entry_type=anime&entry_id={mal_id}"
+        )
+        if resp.status_code == 200:
+            logger.debug("Successfully refreshed data on dbsentinel")
+            await ctx.channel.send(f"Successfully refreshed data on dbsentinel")
+        else:
+            logger.warning(
+                f"Failed to refresh data on dbsentinel: {resp.text} {resp.text}"
+            )
+            error = str(resp.status_code)
+            try:
+                error = resp.json()["error"]
+            except:
+                pass
+            await ctx.channel.send(f"Failed to refresh data on dbsentinel: {error}")
+    else:
+        logger.warning("dbsentinel is offline, skipping refresh request")
 
 
 CHECK_DISABLED = False
