@@ -267,7 +267,9 @@ async def restart(ctx):
 
 
 @log
-async def create_new_embeds(ctx: Optional[commands.Context]=None) -> List[Tuple[Embed, bool]]:
+async def create_new_embeds(
+    ctx: Optional[commands.Context] = None,
+) -> List[Tuple[Embed, bool]]:
     """
     git pulls, reads the json cache, and returns new embeds if they exist
     this *is* blocking, but temporarily blocking seems better than managing multple processes
@@ -462,13 +464,19 @@ async def refresh(ctx: commands.Context, mal_id: int) -> None:
     async def _dbsentinel_update() -> None:
         async with aiohttp.ClientSession() as async_client:
             if (await async_client.get(f"{dbsentinel_base_url}/ping")).status == 200:
-                logger.debug(f"dbsentinel is online, sending refresh request for {mal_id}")
+                logger.debug(
+                    f"dbsentinel is online, sending refresh request for {mal_id}"
+                )
                 resp = await async_client.get(
                     f"{dbsentinel_base_url}/tasks/refresh_entry?entry_type=anime&entry_id={mal_id}"
                 )
                 if resp.status == 200:
-                    logger.debug(f"Successfully refreshed data on {mal_id} on dbsentinel")
-                    await ctx.channel.send(f"Successfully refreshed data for {mal_id} on dbsentinel: <https://sean.fish/dbsentinel/anime/{mal_id}>")
+                    logger.debug(
+                        f"Successfully refreshed data on {mal_id} on dbsentinel"
+                    )
+                    await ctx.channel.send(
+                        f"Successfully refreshed data for {mal_id} on dbsentinel: <https://sean.fish/dbsentinel/anime/{mal_id}>"
+                    )
                 else:
                     logger.warning(
                         f"Failed to refresh data for {mal_id} on dbsentinel: {resp.text} {resp.text}"
@@ -478,10 +486,16 @@ async def refresh(ctx: commands.Context, mal_id: int) -> None:
                         error = (await resp.json())["error"]
                     except:
                         pass
-                    await ctx.channel.send(f"Failed to refresh data for {mal_id} on dbsentinel: {error}")
+                    await ctx.channel.send(
+                        f"Failed to refresh data for {mal_id} on dbsentinel: {error}"
+                    )
             else:
-                logger.warning(f"dbsentinel is offline, skipping refresh request for {mal_id}")
-                await ctx.channel.send(f"dbsentinel is offline, skipping refresh request for {mal_id}")
+                logger.warning(
+                    f"dbsentinel is offline, skipping refresh request for {mal_id}"
+                )
+                await ctx.channel.send(
+                    f"dbsentinel is offline, skipping refresh request for {mal_id}"
+                )
 
     # run both refreshes in parallel
     await asyncio.gather(_update_embed(), _dbsentinel_update())
@@ -538,7 +552,9 @@ async def check(ctx: commands.Context, mal_username: str, num: int) -> None:
                         [
                             "<{}>".format(url)
                             for url in [
-                                f.value for f in embed.fields if f.name == "Source" and f.value
+                                f.value
+                                for f in embed.fields
+                                if f.name == "Source" and f.value
                             ][0].split()
                         ]
                     )
