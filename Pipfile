@@ -17,6 +17,7 @@ backoff = "*"
 aiofiles = "*"
 logzero = "*"
 malexport = {git = "https://github.com/seanbreckenridge/malexport/"}
+httpx = "*"
 
 [scripts]
 bot = "python3 bot.py"
