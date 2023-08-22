@@ -26,7 +26,7 @@ from .utils import (
     truncate,
     extract_mal_id_from_url,
     log,
-    remove_discord_link_supression,
+    remove_discord_link_suppression,
 )
 from .utils.embeds import (
     create_embed,
@@ -398,8 +398,8 @@ async def source(ctx: commands.Context, mal_id: int, *, links: str) -> None:
     if adding_source:
         # if there are multiple links, check each
         for link in links.split():
-            # remove supression from link, if it exists
-            link = remove_discord_link_supression(link)
+            # remove suppression from link, if it exists
+            link = remove_discord_link_suppression(link)
             valid_links.append(link)
 
     # get logs from feed
@@ -647,7 +647,7 @@ async def on_command_error(ctx, error):
 
     # prevent self-loops; on_command_error calling on_command_error
     if hasattr(ctx.command, "on_error"):
-        logger.warning("on_command_error self loop occured")
+        logger.warning("on_command_error self loop occurred")
         return
 
     if isinstance(error, commands.CommandNotFound):

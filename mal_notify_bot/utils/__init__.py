@@ -36,7 +36,7 @@ def extract_mal_id_from_url(url: str) -> Optional[str]:
         return str(result[0])
 
 
-def remove_discord_link_supression(link: str) -> str:
+def remove_discord_link_suppression(link: str) -> str:
     link = link.strip()
     if link.startswith("<") and link.endswith(">"):
         link = link[1:-1]
