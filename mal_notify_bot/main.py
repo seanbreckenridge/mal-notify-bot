@@ -13,7 +13,6 @@ from dataclasses import dataclass
 import aiohttp
 import yaml
 import requests
-import httpx
 import aiofiles  # type: ignore[import]
 from git.cmd import Git  # type: ignore[import]
 from logzero import logger  # type: ignore[import]
