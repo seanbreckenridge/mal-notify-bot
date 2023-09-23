@@ -43,7 +43,7 @@ token_file = os.path.join(root_dir, "token.yaml")
 
 old_db_file = os.path.join(root_dir, "old")
 assert os.path.exists(old_db_file)
-# arbitrary check to make sure the olddb isnt empty
+# arbitrary check to make sure the olddb isn't empty
 assert len(pathlib.Path(old_db_file).read_text()) > 10000
 
 # file to export sources as a backup
@@ -271,7 +271,7 @@ async def create_new_embeds(
 ) -> List[Tuple[Embed, bool]]:
     """
     git pulls, reads the json cache, and returns new embeds if they exist
-    this *is* blocking, but temporarily blocking seems better than managing multple processes
+    this *is* blocking, but temporarily blocking seems better than managing multiple processes
     """
     await update_git_repo()
     ids = await read_json_cache()
@@ -286,7 +286,7 @@ async def create_new_embeds(
         logger.debug(f"new ids: {truncate(new_ids, 200)}")
         logger.debug(f"({len(new_ids)} new ids)")
 
-    # couldnt have possibly be 10000 entries approved since we last checked
+    # couldn't have possibly be 10000 entries approved since we last checked
     # this means there was an error writing to old_db
     if len(new_ids) > 10000:
         error_message = f"There were {len(new_ids)} new entries, there must have been an error writing to the old_db file at '{Globals.old_db.filepath}'"
@@ -323,7 +323,7 @@ async def print_new_embeds():
             )
         else:
             logger.debug(
-                f"Couldnt find any message with id {new_mal_id}, printing new message"
+                f"Couldn't find any message with id {new_mal_id}, printing new message"
             )
         if (
             new_mal_id not in old_ids and previous_message is None
@@ -349,7 +349,7 @@ async def print_new_embeds():
                 logger.warning(f"Couldn't publish message {publish_err}")
         else:
             logger.warning(
-                f"Couldnt find printed message for id {new_mal_id} in channel"
+                f"Couldn't find printed message for id {new_mal_id} in channel"
             )
             sys.exit(1)
     await Globals.old_db.dump(old_ids)
@@ -527,7 +527,7 @@ async def check(ctx: commands.Context, mal_username: str, num: int) -> None:
     await message.edit(
         content=f"Downloaded {mal_username}'s list (downloaded {len(parsed)} anime entries...)"
     )
-    found_entry = False  # mark True if we find an entry the user hasnt watched
+    found_entry = False  # mark True if we find an entry the user hasn't watched
     async for message in Globals.feed_channel.history(limit=num, oldest_first=False):
         try:
             embed = message.embeds[0]

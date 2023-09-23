@@ -67,7 +67,7 @@ async def get_data(
         "https://myanimelist.cdn-dena.com/img/sp/icon/"
     ):
         image = None
-    # return something so that there form POST has value incase synopsis is empty
+    # return something so that there form POST has value in case synopsis is empty
     synopsis = resp.get("synopsis", "No Synopsis")
     if synopsis is not None:
         synopsis.replace("\r", "")
@@ -108,7 +108,7 @@ def add_to_embed(
                 discord_embed_object.add_field(
                     name=name, value=embed_value_helper(embed_dict, name), inline=inline
                 )
-        # if this field wasnt in the fields previously, add it to the embed object
+        # if this field wasn't in the fields previously, add it to the embed object
         else:
             if value is not None:
                 discord_embed_object.add_field(name=name, value=value, inline=inline)
