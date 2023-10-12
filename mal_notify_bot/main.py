@@ -58,7 +58,7 @@ client = commands.Bot(
 client.remove_command("help")  # remove default help
 
 
-ADMIN_ROLE = "admin"
+ADMIN_ROLE = "mod"
 TRUSTED_ROLE = "trusted"
 
 
